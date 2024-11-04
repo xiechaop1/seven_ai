@@ -101,7 +101,7 @@ def get_device():
 class Settings(BaseSettings):
     # API Listen
     LISTEN_IP: str = "0.0.0.0"
-    PORT: int = 9001
+    PORT: int = 9002
 
     ENV: str = "pre"
     TZ: str = "Asia/Shanghai"
