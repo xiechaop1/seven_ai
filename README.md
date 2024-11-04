@@ -1,1 +1,1 @@
-# aivoicechat
+**api文档见docs目录**
