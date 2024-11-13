@@ -55,14 +55,15 @@
 | data      | 数据 |  VCRespData数据结构 | 见VCRespData定义| 是 | 
 
 #### VCRespData结构
-| 参数 | 说明  | 数据格式|缺省值|是否必填|
+| 参数 | 说明  | 数据格式|值|是否必填|
 |:------------- |:---------------| :---------------|  :---------------| :---------------| 
-| text      | 文字内容 |   字符串| |是 | 
-| sample_rate      | 采样率 |   int|16000 |是 | 
-| channels      | 声道 |   int|1 |是 | 
-| sample_format      | 格式 |   字符串|S16LE |是 | 
-| bitrate      | 码率 |   int|256000 |是 | 
-| audio_data      | pcm格式数据 |   字符串|base64编码 |是 | 
+| text      | 文字内容 |   字符串| |否 | 
+| audio_data      | 音频数据 |   字符串|base64编码 |否 | 
+| audio_format      | 数据格式 |   字符串|pcm或mp3 |否 | 
+| sample_rate      | 采样率 |   int|16000 |否 | 
+| channels      | 声道 |   int|1 |否 | 
+| sample_format      | 格式 |   字符串|S16LE |否 | 
+| bitrate      | 码率 |   int|256000 |否 | 
 | stream_seq      | 流顺序号，-1表示流已经结束 |   int|0 |是 | 
 
 #### 响应示例
@@ -81,6 +82,7 @@
     "sample_format": "S16LE",
     "bitrate": 256000,
     "audio_data": "AAAAAAAP//AAD8////9//1/ywAMQAPAAwA+v/9/xUACAABAPf/8f/z//b/",
+    "audio_format": "pcm",
     "stream_seq":1
   }
 }
@@ -109,11 +111,12 @@ class Req(BaseModel, Generic[DataT]):
 
 class VCRespData(BaseModel):
     text: Optional[str] = ""
-    sample_rate: int = 16000
-    channels: int = 1
-    sample_format: str = "S16LE"
-    bitrate: int = 256000
-    audio_data: Optional[str] = ""
+    audio_format: Optional[str] = "pcm"
+    sample_rate: Optional[int] = None
+    channels: Optional[int] = None
+    sample_format: Optional[str] = None
+    bitrate: Optional[int] = None
+    audio_data: Optional[str] = None
     stream_seq: int = 0
 
 class Resp(BaseModel, Generic[DataT]):

@@ -23,3 +23,9 @@ python-multipart
 tiktoken
 websockets
 websocket-client
+sqlmodel
+alembic
+pgvector
+psycopg
+psycopg2
+psycopg2-binary

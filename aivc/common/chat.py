@@ -25,11 +25,12 @@ class Req(BaseModel, Generic[DataT]):
 
 class VCRespData(BaseModel):
     text: Optional[str] = ""
-    sample_rate: int = 16000
-    channels: int = 1
-    sample_format: str = "S16LE"
-    bitrate: int = 256000
-    audio_data: Optional[str] = ""
+    audio_format: Optional[str] = "pcm"
+    sample_rate: Optional[int] = None
+    channels: Optional[int] = None
+    sample_format: Optional[str] = None
+    bitrate: Optional[int] = None
+    audio_data: Optional[str] = None
     stream_seq: int = 0
     
 class Resp(BaseModel, Generic[DataT]):
@@ -44,8 +45,8 @@ class Resp(BaseModel, Generic[DataT]):
     def __str__(self):
         data_str = ""
         if isinstance(self.data, VCRespData):
-            data_str = f"audio_data len: {len(self.data.audio_data)} text: {self.data.text} stream_seq: {self.data.stream_seq}"
-        return f"version: {self.version} method: {self.method} conversation_id: {self.conversation_id} message_id: {self.message_id} code: {self.code} message: {self.message} data_str:{data_str}"
+            data_str = f"audio_format:{self.data.audio_format} audio_data len: {len(self.data.audio_data)} text: {self.data.text} stream_seq: {self.data.stream_seq}"
+        return f"version: {self.version} method: {self.method} conversation_id: {self.conversation_id} message_id: {self.message_id} code: {self.code} message: {self.message} data:: {data_str}"
 
 class Prompt(BaseModel):
     system: Optional[str] = ""
