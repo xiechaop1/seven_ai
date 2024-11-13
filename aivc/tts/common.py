@@ -6,7 +6,12 @@ class TTSRsp(BaseModel):
     code: int = 0
     message: str = ""
     text: Optional[str] = None
-    audio_data: Optional[bytes] = None   
+    audio_format: Optional[str] = None
+    sample_format: Optional[str] = None 
+    bitrate: Optional[int] = None
+    channels: Optional[int] = None
+    sample_rate: Optional[int] = None
+    audio_data: Optional[bytes] = b""
     stream_seq: int = 0
     status: int = 0
     audio_path: Optional[str] = None   
@@ -23,6 +28,7 @@ class XunFeiVoice(Enum):
     """
     讯飞语音合成（TTS）角色枚举类。
     """
+    XUXIAOBAO = 'aisbabyxu'    # 讯飞许小宝
     FANGFANG = 'x4_xiaofang'    # 讯飞芳芳
     XIAOYAN = 'xiaoyan'        # 讯飞小燕
     MENGMENGHAPPY = 'x_mengmenghappy'    # 讯飞萌萌-高兴

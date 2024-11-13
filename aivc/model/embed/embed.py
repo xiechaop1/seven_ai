@@ -10,17 +10,10 @@ class EmbedModel:
     V1 = 'V1'
 
     models: Dict[str, SentenceTransformer] = {}
-
-    @classmethod
-    def preload_models(cls):
-        """在程序启动时调用此类方法来预加载模型"""
-        if cls.V1 not in cls.models:
-            cls.models[cls.V1] = SentenceTransformer(settings.EMBEDDING_MODEL_V1)
     
-    def __init__(self,version:Optional[str]=None):
+    def __init__(self, version:Optional[str]=None):
         self._load_model(EmbedModel.V1, settings.EMBEDDING_MODEL_V1)
 
-        
     def _load_model(self, version: str, model_name: str):
         if version not in EmbedModel.models:
             start_time = time.time()

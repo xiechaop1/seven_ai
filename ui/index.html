@@ -100,6 +100,7 @@
 </head>
 <body>
     <div class="container">
+        <audio id="audioId" width="100" height="50" autoplay></audio>
         <div id="timer">00:00:000</div>
         <button id="vadToggle">Enable Voice Auto Detection</button>
         <button id="recordButton">Press and Hold to Chat</button>
@@ -579,9 +580,16 @@
                                 log(`Error from server: ${message.message}`);
                                 updateStatus('Error');
                             }else if (message.method === 'voice-chat') {
-                                log(`Received voice-chat message`);
+                                log(`Received voice-chat message audio_format:${message.data.audio_format}`);
                                 // updateAIResponse(message.data.text);
-                                handleReceivedPCM(message.data.audio_data);
+                                if(message.data.audio_format === 'mp3') {
+                                    cleanupAudio();
+                                    playMP3(message.data.audio_data);
+                                } else if(message.data.audio_format === 'pcm') {
+                                    handleReceivedPCM(message.data.audio_data);
+                                } else {
+                                    log(`Received unknown audio format: ${message.data.audio_format}`);
+                                }
                             } else {
                                 log(`Received unknown message type: ${message.type}`);
                             }
@@ -592,6 +600,112 @@
                 };
             });
         }
+
+ 
+ 
+        function playMP3(base64Data) {
+    try {
+        if (!base64Data) {
+            throw new Error('No base64 data provided');
+        }
+
+        const audio = document.getElementById("audioId");
+        if (!audio) {
+            throw new Error('Audio element not found');
+        }
+
+        // 清理之前的资源
+        if (audio.src) {
+            URL.revokeObjectURL(audio.src);
+            audio.removeAttribute('src');
+            audio.load();
+        }
+
+        // 直接将base64转换为二进制数据
+        const binaryData = atob(base64Data);
+        const arrayBuffer = new Uint8Array(binaryData.length);
+        for (let i = 0; i < binaryData.length; i++) {
+            arrayBuffer[i] = binaryData.charCodeAt(i);
+        }
+
+        // 创建具有正确MIME类型的Blob
+        const audioBlob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+        console.log('Created audio blob:', {
+            size: audioBlob.size,
+            type: audioBlob.type
+        });
+
+        const objectUrl = URL.createObjectURL(audioBlob);
+
+        // 设置音频事件处理
+        audio.oncanplay = () => {
+            console.log('Audio ready to play, duration:', audio.duration);
+            audio.play()
+                .then(() => console.log('Playback started'))
+                .catch(err => console.error('Playback failed:', err));
+        };
+
+        audio.onloadedmetadata = () => {
+            console.log('Audio metadata loaded:', {
+                duration: audio.duration,
+                sampleRate: audio.sampleRate,
+                size: audioBlob.size
+            });
+        };
+
+        audio.onerror = (e) => {
+            const error = audio.error;
+            console.error('Audio error:', {
+                code: error.code,
+                message: error.message,
+                networkState: audio.networkState,
+                readyState: audio.readyState
+            });
+            URL.revokeObjectURL(objectUrl);
+        };
+
+        audio.onended = () => {
+            console.log('Playback ended');
+            // 不要在播放结束时立即释放URL，因为可能需要重新播放
+            // URL.revokeObjectURL(objectUrl);
+        };
+
+        // 验证浏览器支持
+        const canPlayType = audio.canPlayType('audio/mpeg');
+        console.log('Browser MP3 support level:', canPlayType);
+
+        // 设置音频属性和源
+        audio.preload = 'auto';
+        audio.src = objectUrl;
+        audio.load();
+
+        // 检查前几个字节以验证MP3格式
+        const header = new Uint8Array(arrayBuffer.slice(0, 4));
+        console.log('File header:', Array.from(header).map(b => b.toString(16)));
+
+        return {
+            blob: audioBlob,
+            url: objectUrl
+        };
+
+    } catch (error) {
+        console.error('Error processing audio:', error);
+        throw error;
+    }
+}
+
+function cleanupAudio() {
+    const audio = document.getElementById("audioId");
+    if (audio) {
+        if (audio.src) {
+            URL.revokeObjectURL(audio.src);
+        }
+        audio.removeAttribute('src');
+        audio.load();
+    }
+}
+
+ 
 
         // 处理接收到的 PCM 数据
         async function handleReceivedPCM(data) {

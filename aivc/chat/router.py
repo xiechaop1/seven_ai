@@ -1,10 +1,15 @@
-from aivc.chat.task_classifier import TaskClassifier
 import asyncio
 from aivc.config.config import L
 from aivc.common.route import Route
 import time
-from aivc.common.task_class import TCData
 import traceback
+from sqlmodel import Session
+from aivc.data.db.pg_engine import engine
+from aivc.model.embed.embed import EmbedModel
+from aivc.common.kb import KBSearchResult
+from typing import Optional
+from aivc.data.db import kb
+
 
 class Router:
     def __init__(self,
@@ -14,17 +19,33 @@ class Router:
     async def router(self):
         start_time = time.perf_counter()
  
-        task_name = await self.task_classifier()
-        self.route.task_class = task_name
-        L.debug(f"router question:{self.route.query_analyzer.question} task_name:{task_name} cost:{int((time.perf_counter() - start_time) * 1000)}ms")
+        kb_result = await self.search_kb()
+        self.route.kb_result = kb_result
+        L.debug(f"router question:{self.route.query_analyzer.question} kb_result:{kb_result} cost:{int((time.perf_counter() - start_time) * 1000)}ms")
 
 
-    async def task_classifier(self):
-        task_name = TCData.DEFAULT
+    async def search_kb(self) -> Optional[KBSearchResult]:
         try:
-            task_classifier = TaskClassifier(question=self.route.query_analyzer.question)
-            task_name = await asyncio.to_thread(task_classifier.classify)
+            def sync_search():
+                try:
+                    with Session(engine) as session:
+                        vector = EmbedModel().embed(self.route.query_analyzer.question)
+                        return kb.search_similar_questions(
+                            session=session,
+                            vector=vector,
+                            top_k=5
+                        )
+                except Exception as e:
+                    L.error(f"search_kb sync_search error: {e}")
+                    traceback.print_exc()
+                    return None
+
+            results = await asyncio.to_thread(sync_search)
+            if results and len(results) > 0:
+                return results[0]
+            return None
+                
         except Exception as e:
-            L.error(f"task_classifier error:{e}")
+            L.error(f"search_kb error: {e}")
             traceback.print_exc()
-        return task_name
+            return None

@@ -3,15 +3,14 @@ from aivc.common.task_class import TCData
 from aivc.model.embed.embed import EmbedModel
 from aivc.config.config import L
 import time
+import numpy as np
 
 class TaskClassifier:
     def __init__(self,
                 question:str=""):
         self.question = question 
 
-    def classify(self, threshold=0.7):
-        L.debug(f"question:{self.question}")
-
+    def classify(self, threshold=0.8):
         all_similar_words = []
         task_indices = []
         for task in TCData().task_classes:
@@ -35,7 +34,8 @@ class TaskClassifier:
                 max_task_name = task.name
 
         if max_score > threshold:
-            L.debug(f"result question:{self.question} task_name:{max_task_name} score:{max_score}")
+            index = int(np.where(scores == max_score)[0][0])
+            L.debug(f"result question:{self.question} task_name:{max_task_name} score:{max_score} similar_words:{all_similar_words[index]}")
             return max_task_name
         else:
             return TCData.DEFAULT

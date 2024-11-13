@@ -142,8 +142,16 @@ class Settings(BaseSettings):
     DEFAULT_TOP_P:int = 1
     QA_NO_RESULT_RSP:str = "非常抱歉，因为某些原因，暂时无法回答您的问题，请稍后再试或者换个问题"
 
-    AUDIO_QUEUE_MAXSIZE:int = 3
+    AUDIO_QUEUE_MAXSIZE:int = 300
     VERSION1:str = "1.0"
+
+    POSTGRES_SERVER: str = "127.0.0.1"
+    POSTGRES_PORT: int = 5432
+    POSTGRES_DB: str = "qa"
+    POSTGRES_USER: str = "qa_user"
+    POSTGRES_PASSWORD: str = "CfzpN8uEDkFTw"
+
+    SONG_DIR: str = os.path.join(PATH, "assets/song")
 
 
 settings = Settings() 

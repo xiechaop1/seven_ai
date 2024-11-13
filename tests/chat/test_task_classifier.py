@@ -10,8 +10,9 @@ def test_task_classifier_case1():
 
 def test_task_classifier_case2():
     questions = {
-        "介绍一下你自己？": TCData.ABOUT,
-        "唱首儿歌?": TCData.Songs,
+        "你是谁": TCData.ABOUT,
+        "唱歌": TCData.Songs,
+        "背首唐诗？": TCData.DEFAULT,
     }
     for question, task_name in questions.items():
         task_classifier = TaskClassifier(question=question)

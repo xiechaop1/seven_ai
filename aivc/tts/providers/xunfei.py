@@ -37,7 +37,7 @@ class XunFeiTTS:
         self.BusinessArgs = {
             "aue": "raw",
             "auf": "audio/L16;rate=16000",
-            "vcn": XunFeiVoice.FANGFANG.value,
+            "vcn": XunFeiVoice.XUXIAOBAO.value,
             "tte": "utf8"
         }
         self.Data = {"status": self.STATUS_LAST_FRAME, "text": ""}
@@ -245,6 +245,11 @@ class XunFeiTTS:
             message="Success",
             text=text,
             audio_data=bytes(self.current_result),
+            audio_format="pcm",
+            sample_format="S16LE",
+            bitrate=256000,
+            channels=1,
+            sample_rate=16000,
             audio_path=output_path,
             input_size=float(len(text)),
             output_length=output_length,

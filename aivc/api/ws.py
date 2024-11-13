@@ -14,6 +14,7 @@ async def ws(websocket: WebSocket):
     await websocket.accept()
     L.info(f"WebSocket connected {websocket.client.host:}:{websocket.client.port}")
 
+    conversation_id = ""
     try:
         while True:
             try:
