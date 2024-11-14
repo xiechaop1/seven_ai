@@ -96,6 +96,9 @@
             background-color: #ff0000;
             color: white;
         }
+        #imageUpload {
+            margin-top: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -124,6 +127,7 @@
         <div id="status">Ready</div>
         <div id="conversationLog"></div>
         <div id="logArea"></div>
+        <input type="file" id="imageUpload" accept="image/*">
     </div>
 
     <script>
@@ -133,6 +137,7 @@
         const status = document.getElementById('status');
         const logArea = document.getElementById('logArea');
         const timerDisplay = document.getElementById('timer');
+        const imageUpload = document.getElementById('imageUpload');
 
         // Network
         let startTime;
@@ -351,7 +356,7 @@
                             message_id:getMessageId(),
                             token:getMessageId(),
                             data: {
-                                audio_data: btoa(pcm_binary)
+                                content: btoa(pcm_binary)
                             }
                         }));
                         log('voice-chat PCM audio data sent successfully');
@@ -823,6 +828,39 @@ function cleanupAudio() {
                 offset += buffer.length;
             });
             return result;
+        }
+
+        imageUpload.addEventListener('change', handleImageUpload);
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const base64Image = e.target.result.split(',')[1];
+                    sendImage(base64Image);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function sendImage(base64Image) {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    version: "1.0",
+                    method: "voice-chat",
+                    conversation_id: conversation_id,
+                    message_id: getMessageId(),
+                    token: getMessageId(),
+                    data: {
+                        content_type: "image",
+                        content: base64Image
+                    }
+                }));
+                log('Image data sent successfully');
+            } else {
+                log('WebSocket is not open. Cannot send image.');
+            }
         }
 
         // Initialize recorder and WebSocket when the page loads

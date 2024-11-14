@@ -12,13 +12,14 @@ from time import mktime
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
 import os
-import uuid
 from functools import partial
 from aivc.config.config import L,settings
 from aivc.tts.common import TTSRsp, XunFeiVoice
+from aivc.tts.base import BaseTTS
+from aivc.utils.id import get_filename
 
 
-class XunFeiTTS:
+class XunFeiTTS(BaseTTS):
     PROVIDER = "xunfei"
 
     APP_ID_ENV_KEY = "XUNFEI_APP_ID"
@@ -29,7 +30,8 @@ class XunFeiTTS:
     STATUS_CONTINUE_FRAME = 1    # 中间帧标识
     STATUS_LAST_FRAME = 2         # 最后一帧的标识
 
-    def __init__(self):
+    def __init__(self, trace_sn: str = None):
+        self.trace_sn = trace_sn
         self.APPID = self.get_app_id()
         self.APIKey = self.get_api_key()
         self.APISecret = self.get_api_secret()
@@ -116,10 +118,6 @@ class XunFeiTTS:
             audio = data.get("audio", "")
             status = data.get("status", -1)
 
-            # rsp_message = message.get("message", "")
-            # ced = data.get("ced", "")
-            # L.debug(f"讯飞语音合成on_message code:{code} rsp_message:{rsp_message} sid:{sid} status:{status} ced:{ced}")
-
             if code != 0:
                 err_msg = message.get("message", "Unknown error")
                 L.error(f"sid:{sid} 调用出错: {err_msg} 错误码:{code}")
@@ -168,18 +166,7 @@ class XunFeiTTS:
 
         self.executor.submit(run)
 
-    def get_filename(self):
-        """
-        生成唯一的文件名
-        """
-        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-        unique_id = uuid.uuid4()
-        return f"{timestamp}_{unique_id}.pcm"
-
     async def tts(self, text: str) -> TTSRsp:
-        """
-        异步启动WebSocket连接并执行TTS
-        """
         start_time = time.perf_counter()
         url = self.create_url()
 
@@ -214,7 +201,7 @@ class XunFeiTTS:
                 cost=int((time.perf_counter() - start_time) * 1000)
             )
 
-        output_path = os.path.join(settings.OUTPUT_ROOT_PATH, self.get_filename())
+        output_path = os.path.join(settings.OUTPUT_ROOT_PATH, get_filename(trace_sn=self.trace_sn))
 
         # 将接收到的音频数据写入文件
         try:

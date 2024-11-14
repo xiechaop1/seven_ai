@@ -6,12 +6,17 @@ from aivc.config.config import L
 import json
 from aivc.utils.tools import remove_outside_curly_brackets
 import asyncio
+from aivc.common.chat import Prompt
+import traceback
 
 def generate_message(question="hello"):
-    return Chat(
-        llm_type=LLMType.OLLAMA,
-        model_name=OllamaLLM.LLAMA3_CHATQA_8B,
-    ).gen_messages(question=question)
+    return Chat().gen_messages(question=question)
+
+def generate_vision_message():
+    return Chat().gen_vision_messages(
+        img_path="/Users/gaochao/Downloads/4ead323f-add6-44d1-9cf9-dd326c8f9456.jpeg",
+        prompt=Prompt(user="你是一个儿童陪伴助手，用孩子能理解的语言，简洁明了的描述图片的内容。")
+    )
 
 def test_llm_req(llm_type=LLMType.OPENAI, name=OpenAILLM.GPT35_TURBO, question="", timeout=60):
     llm = LLMManager.create_llm(llm_type=llm_type , name=name, timeout=timeout)
@@ -25,13 +30,16 @@ def test_llm_req(llm_type=LLMType.OPENAI, name=OpenAILLM.GPT35_TURBO, question="
         data = json.loads(remove_outside_curly_brackets(content))
         return data, response.cost
     except Exception as e:
-        L.error(f"--*-- error --*-- :{e}")
+        L.error(f"--*-- error --*-- :{e} stack:{traceback.format_exc()}")
         return -1, response.cost
 
-async def test_llm_async_req(llm_type=LLMType.OPENAI, name=OpenAILLM.GPT35_TURBO, question="", timeout=60):
+async def test_llm_async_req(llm_type=LLMType.OPENAI, name=OpenAILLM.GPT35_TURBO, question="", question_type="text",timeout=60):
     start_time = time.time()
     llm = LLMManager.create_llm(llm_type=llm_type , name=name, timeout=timeout)
-    messages = generate_message(question=question)
+    if question_type == "image":
+        messages = await generate_vision_message()
+    else:
+        messages = await generate_message(question=question)
     response = ""
     i = 0
     cost = 0
@@ -43,17 +51,20 @@ async def test_llm_async_req(llm_type=LLMType.OPENAI, name=OpenAILLM.GPT35_TURBO
             if chunk_message:
                 response += chunk_message
                 print(f"chunk_message:{chunk_message}")
-        data = json.loads(remove_outside_curly_brackets(response))
+        try:
+            data = json.loads(remove_outside_curly_brackets(response))
+        except json.JSONDecodeError:
+            data = response   
         return data, cost
     except Exception as e:
-        L.error(f"--*-- error --*-- :{e}")
+        L.error(f"--*-- error --*-- :{e} stack:{traceback.format_exc()}")
         return -1, round(time.time()-start_time, 3)
 
 
-def test_llm(llm_type=LLMType.OPENAI, name=OpenAILLM.GPT35_TURBO, question=""):
+def test_llm(llm_type=LLMType.OPENAI, name=OpenAILLM.GPT35_TURBO, question="", question_type="text"):
     # result, cost = test_llm_req(llm_type=llm_type, name=name, question=question)
     # print(f"req result:{result}, cost:{cost}")
-    result, cost = asyncio.run(test_llm_async_req(llm_type=llm_type, name=name, question=question))
+    result, cost = asyncio.run(test_llm_async_req(llm_type=llm_type, name=name, question=question, question_type=question_type))
     print(f"async req result:{result}, cost:{cost}")
 
 def test_llm_openai(question: str=""):
@@ -66,7 +77,7 @@ def test_llm_qwen(question: str=""):
     test_llm(llm_type=LLMType.QWEN, name=QWenLLM.QWEN_LONG, question=question)
 
 def test_llm_zhipu(question: str=""):
-    test_llm(llm_type=LLMType.ZhiPu, name=ZhiPuLLM.GLM_3, question=question)
+    test_llm(llm_type=LLMType.ZhiPu, name=ZhiPuLLM.GLM_4V_PLUS, question=question,question_type="image")
 
 def test_llm_moonshot(question: str=""):
     test_llm(llm_type=LLMType.MOONSHOT, name=MoonShotLLM.V1_8K, question=question)
@@ -80,4 +91,4 @@ def test_llm_ollama(question: str=""):
 
 if __name__ == "__main__":
     question = "你好"
-    test_llm_moonshot(question=question)
+    test_llm_zhipu(question=question)

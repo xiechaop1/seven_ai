@@ -9,8 +9,14 @@ class VCMethod(str, Enum):
     TEXT_CHAT = "text-chat"
     PING = "ping"
 
+
+class ContentType(str, Enum):
+    AUDIO = "audio"
+    IMAGE = "image"
+
 class VCReqData(BaseModel):
-    audio_data: Optional[str] = ""
+    content_type: Optional[str] = ContentType.AUDIO.value  # audio or image
+    content: Optional[str] = "" # base64 encoded data
 
 DataT = TypeVar("DataT")
 

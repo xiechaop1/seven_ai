@@ -23,7 +23,8 @@
 ####  VCReqData结构
 | 参数 | 说明  | 数据格式|缺省值|是否必填|
 |:------------- |:---------------| :---------------|  :---------------| :---------------| 
-| audio_data      | pcm格式数据 |   字符串|base64编码 |是 | 
+| content_type      | 数据格式 |   字符串|audio或image |是 | 
+| content      | 数据 |   字符串|base64编码 |是 | 
 
 #### 请求示例
 ```
@@ -35,7 +36,8 @@
   "token": "20241031-013946-f674310c-0c7f-440e-901a-075c6c28b552",
   "timestamp": "2024-10-31T09:49:09.761387+08:00",
   "data": {
-    "audio_data": "JQIkA4MBxv+p/xT/Sv3U/Ir/yQLtBOgDqv9O/Hz7oP0QAZAC9gKeAngAXf5o/Fr9NgGlA/kCOADx/Tb+P/96/7b/OgFdAzUCwv1Z+iv7jADABaYFfwFH/E36T/wj/2EBRQM0BMwCm/4C+xv7JP4OAWwDPQRXAg=="
+    "content_type": "audio",
+    "content": "JQIkA4MBxv+p/xT/Sv3U/Ir/yQLtBOgDqv9O/Hz7oP0QAZAC9gKeAngAXf5o/Fr9NgGlA/kCOADx/Tb+P/96/7b/OgFdAzUCwv1Z+iv7jADABaYFfwFH/E36T/wj/2EBRQM0BMwCm/4C+xv7JP4OAWwDPQRXAg=="
   }
 }
 ```
@@ -95,8 +97,13 @@ class VCMethod(str, Enum):
     TEXT_CHAT = "text-chat"
     PING = "ping"
 
+class ContentType(str, Enum):
+    AUDIO = "audio"
+    IMAGE = "image"
+
 class VCReqData(BaseModel):
-    audio_data: Optional[str] = ""
+    content_type: Optional[str] = ContentType.AUDIO.value  # audio or image
+    content: Optional[str] = "" # base64 encoded data
 
 DataT = TypeVar("DataT")
 

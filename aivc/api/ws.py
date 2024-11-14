@@ -28,7 +28,7 @@ async def ws(websocket: WebSocket):
 
                 if method == VCMethod.VOICE_CHAT:
                     req = Req[VCReqData](**req_data)
-                    L.debug(f"ws conversation_id: {req.conversation_id} message_id: {req.message_id} audio_data len: {len(req.data.audio_data)}")
+                    L.debug(f"ws conversation_id: {req.conversation_id} message_id: {req.message_id} content_type:{req.data.content_type} content len: {len(req.data.content)}")
                     trace_tree = TraceTree(
                         root = TraceRoot(
                             client_addr=f"{websocket.client.host}:{websocket.client.port}",
