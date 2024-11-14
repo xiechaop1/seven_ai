@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+import base64
 
 def get_id() -> str:
     timestamp = datetime.now().strftime('%Y%m%d-%H%M%S-%f')[:-3]
@@ -10,3 +11,19 @@ def get_conversation_id() -> str:
 
 def get_message_id() -> str:
     return get_id()
+
+def short_uuid():
+    while True:
+        uid = base64.urlsafe_b64encode(bytes.fromhex(uuid.uuid4().hex)).decode('ascii').rstrip('=')
+        if not uid.startswith(('-', '_')):
+            return uid
+        
+def get_filename(trace_sn: str = None, ext: str = 'pcm') -> str:
+    ts = datetime.now().strftime('%Y%m%d%H%M%S')
+    unique_id = short_uuid()
+    filename = f"{ts}-{unique_id}.{ext}"
+    if trace_sn:
+        prefix = trace_sn
+        ts = datetime.now().strftime('%H%M%S')
+        filename = f"{prefix}-{ts}-{unique_id}.{ext}"
+    return filename

@@ -1,10 +1,11 @@
 import os
 from aivc.chat.llm.base import BaseLLM
 from aivc.chat.llm.common import PricingInfo, ModelInfo, LLMRsp
-from openai import OpenAI,AsyncOpenAI
+from zhipuai import ZhipuAI
 from typing import List, Dict, Any
 import time
 from aivc.config.config import settings, L
+import asyncio
 
 class ZhiPuLLM(BaseLLM):
     base_url = "https://open.bigmodel.cn/api/paas/v4/"
@@ -13,6 +14,8 @@ class ZhiPuLLM(BaseLLM):
 
     GLM_4 = "glm-4"
     GLM_3 = "glm-3-turbo"
+    GLM_4V_PLUS = "glm-4v-plus"
+
 
     MODELS = {
         GLM_4: ModelInfo(
@@ -30,6 +33,14 @@ class ZhiPuLLM(BaseLLM):
                 input=1/settings.M,
                 output=1/settings.M
             )
+        ),
+        GLM_4V_PLUS: ModelInfo(
+            name=GLM_4V_PLUS,
+            context_size=128000-2000,
+            pricing=PricingInfo(
+                input=10/settings.M,
+                output=10/settings.M
+            )
         )
         }
 
@@ -39,13 +50,7 @@ class ZhiPuLLM(BaseLLM):
         self._name = name
         self._timeout = timeout
 
-        self._client = OpenAI(
-            api_key = self.get_api_key(),
-            base_url=self.base_url,
-            timeout=self._timeout
-        )
-
-        self._async_client = AsyncOpenAI(
+        self._client = ZhipuAI(
             api_key = self.get_api_key(),
             base_url=self.base_url,
             timeout=self._timeout
@@ -85,7 +90,7 @@ class ZhiPuLLM(BaseLLM):
 
     async def async_req(self, messages: List[Dict[str, Any]]) -> LLMRsp:
         start_time = time.time()
-        response = await self._async_client.chat.completions.create(
+        response = self._client.chat.asyncCompletions.create(
             model=self._name,
             messages=messages)
         
@@ -102,13 +107,18 @@ class ZhiPuLLM(BaseLLM):
         return result
 
     async def async_req_stream(self, messages: List[Dict[str, Any]]):
-        stream = await self._async_client.chat.completions.create(
-            model=self._name,
-            messages=messages,
-            stream=True)
-
+        # stream = self._client.chat.asyncCompletions.create(
+        #     model=self._name,
+        #     messages=messages,
+        #     stream=True)
+        stream = await asyncio.to_thread(
+                self._client.chat.completions.create,
+                model=self._name,
+                messages=messages,
+                stream=True
+            )
         result = ""
-        async for chunk in stream:
+        for chunk in stream:
             chunk_content = chunk.choices[0].delta.content
             yield chunk_content
             if isinstance(chunk_content, str):

@@ -28,10 +28,10 @@ def create_database_engine():
     try:
         _engine = create_engine(engine_url, connect_args={"connect_timeout": 6})
         with _engine.connect() as conn:
-            L.info(f"Connected to database sucess: {print_url} conn:{conn}")
+            L.info(f"Connected to database sucess: {print_url} conn:{conn} stack:{traceback.format_stack()}")
         return _engine
     except Exception as e:
-        L.error(f"Error creating database: {print_url} error: {str(e)} traceback: {traceback.format_exc()}")
+        L.error(f"Error creating database: {print_url} error: {str(e)} stack: {traceback.format_exc()}")
         return None
  
 engine = create_database_engine()

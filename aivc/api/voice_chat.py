@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, status
 from fastapi.responses import StreamingResponse
 import os
-from typing import Optional,AsyncGenerator
+from typing import Optional,AsyncGenerator,Tuple
 from aivc.srt.manager import SRTManager
 from aivc.utils.id import get_id
 from aivc.srt.common import SRTRsp
@@ -13,7 +13,7 @@ from aivc.tts.common import TTSRsp
 from aivc.utils.audio import calculate_pcm_duration
 import asyncio
 import traceback
-from aivc.common.chat import Req, VCReqData, Resp, VCRespData
+from aivc.common.chat import Req, VCReqData, Resp, VCRespData, ContentType
 import base64
 from aivc.utils.message_dict import MessageDict
 import json
@@ -25,6 +25,7 @@ from aivc.common.kb import KBSearchResult
 from aivc.common.task_class import QuestionType
 from aivc.chat.song import SongPlayer
 
+
 router = APIRouter()
 
 async def process_voice_conversation(
@@ -32,143 +33,36 @@ async def process_voice_conversation(
     trace_sn: str,
     audio_queue: asyncio.Queue,
     cancellation_event: asyncio.Event,
-    trace_tree:TraceTree = TraceTree()):
+    trace_tree:TraceTree = TraceTree(),
+    req: Req[VCReqData] = None):
 
     try:
-        # 语音识别
-        srt = SRTManager.create_srt()
-        srt_rsp: SRTRsp = await srt.recognize(audio_path=file_path)
-        
-        trace_srt = TraceSRT(
-            cost=srt_rsp.cost,
-            code=srt_rsp.code,
-            message=srt_rsp.message,
-            text=srt_rsp.text)
-        trace_tree.srt = trace_srt
-
-        if srt_rsp.code != 0:
-            L.error(f"voice_chat srt error trace_sn:{trace_sn} code:{srt_rsp.code} message:{srt_rsp.message}")
-            rsp = TTSRsp(
-                code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                message=srt_rsp.message)
-            await audio_queue.put(rsp)
-            return
-        L.debug(f"voice_chat srt success trace_sn:{trace_sn} text:{srt_rsp.text} cost:{srt_rsp.cost}")
-        if len(srt_rsp.text.strip()) == 0:
-            L.error(f"voice_chat识别不到有效内容, trace_sn:{trace_sn}")
-            rsp = TTSRsp(
-                code=status.HTTP_400_BAD_REQUEST,
-                message="识别不到有效内容")
-            await audio_queue.put(rsp)
-            return
-
-        # 问题预处理
-        router_start_time = time.perf_counter()
-        route = Route(
-            query_analyzer=QueryAnalyzer(
-                question=srt_rsp.text
-            )
-        )
-        await Router(route=route).router()
-        L.debug(f"voice_chat route trace_sn:{trace_sn} question:{srt_rsp.text} kb_result:{route.kb_result} cost:{int((time.perf_counter() - router_start_time) * 1000)}ms")
-
-        question = srt_rsp.text
+        question = ""
         answer = ""
-        if isinstance(route.kb_result, KBSearchResult):
-            L.debug(f"voice_chat kb_result trace_sn:{trace_sn} category_name:{route.kb_result.category_name}")
-            if route.kb_result.category_name == QuestionType.SONG.value:
-                song_file = SongPlayer().get_next_song(username=trace_tree.root.client_addr)
-                L.debug(f"voice_chat song trace_sn:{trace_sn} song_file:{song_file}")
-                with open(song_file, 'rb') as audio_file:
-                    audio_data =  audio_file.read()
-                    await audio_queue.put(TTSRsp(
-                        audio_data=audio_data,
-                        audio_format="mp3",
-                        stream_seq=1))
-                    
-                # 发送结束标记
-                await audio_queue.put(TTSRsp(
-                    stream_seq=-1))
-            else:
-                answer = route.kb_result.answer
-                llm_rsp_trunk = route.kb_result.answer
-                
-                # 处理 TTS
-                start_time = time.perf_counter()
-                tts = TTSManager.create_tts()
-                tts_rsp: TTSRsp = await tts.tts(text=llm_rsp_trunk)
-                L.debug(f"tts done trace_sn:{trace_sn} tts cost:{int((time.perf_counter() - start_time) * 1000)}ms tts_rsp.code:{tts_rsp.code}")
-                tts_rsp.stream_seq = 1  # 只有一个流
-                
-                if tts_rsp.code != 0:
-                    L.error(f"tts error trace_sn:{trace_sn} code:{tts_rsp.code} message:{tts_rsp.message} audio_data len:{len(tts_rsp.audio_data)}")
-                    rsp = TTSRsp(
-                        code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        message=tts_rsp.message)
-                    await audio_queue.put(rsp)
-                    return
-                
-                # 放入音频数据
-                await audio_queue.put(tts_rsp)
-                
-                # 发送结束标记
-                rsp = TTSRsp(
-                    stream_seq=-1)
-                await audio_queue.put(rsp)
+        if req.data.content_type == ContentType.IMAGE.value:
+            question, answer = await image_handler(
+                file_path=file_path,
+                trace_sn=trace_sn,
+                audio_queue=audio_queue,
+                cancellation_event=cancellation_event,
+                trace_tree=trace_tree,
+                req=req)
         else:
-            chat_instance = Chat()
-            llm_start_time = time.perf_counter()
-            llm_index = 0
-            async for llm_rsp_trunk in chat_instance.chat_stream_by_sentence(
-                    question=question,
-                    trace_tree=trace_tree):
-                if llm_index == 0:
-                    trace_tree.llm.first_cost = int((time.perf_counter() - llm_start_time) * 1000)
-                
-                # 流结束
-                if llm_rsp_trunk is None:
-                    L.debug(f"chat_stream_by_sentence done trace_sn:{trace_sn} llm_index:{llm_index} llm_rsp_trunk:{llm_rsp_trunk}")
-                    rsp = TTSRsp(
-                        stream_seq=-1)
-                    await audio_queue.put(rsp)
-                    break
-                
-                answer += llm_rsp_trunk
-                llm_index += 1
-                L.debug(f"chat_stream_by_sentence trace_sn:{trace_sn} llm_rsp_trunk:{llm_rsp_trunk}")
-                
-                # 检查是否需要中断
-                if cancellation_event.is_set():
-                    L.info(f"voice_chat cancelled during processing trace_sn:{trace_sn}")
-                    break
-                
-                tts = TTSManager.create_tts()
-                tts_rsp: TTSRsp = await tts.tts(text=llm_rsp_trunk)
-                # 流状态
-                tts_rsp.stream_seq = llm_index
-                L.debug(f"tts done trace_sn:{trace_sn} tts_rsp:{tts_rsp} llm_index:{llm_index}")
-
-                if llm_index == 1:
-                    trace_tree.tts = TraceTTS(first_cost=tts_rsp.cost)
-                    
-                if tts_rsp.code != 0:
-                    L.error(f"tts error trace_sn:{trace_sn} code:{tts_rsp.code} message:{tts_rsp.message} audio_data len:{len(tts_rsp.audio_data)}")
-                    rsp = TTSRsp(
-                        code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        message=tts_rsp.message)
-                    await audio_queue.put(rsp)
-                    return   
-                
-                # 等待队列有空位，再放入音频数据
-                await audio_queue.put(tts_rsp)
-
+            question, answer = await audio_handler(
+                file_path=file_path,
+                trace_sn=trace_sn,
+                audio_queue=audio_queue,
+                cancellation_event=cancellation_event,
+                trace_tree=trace_tree,
+                req=req)
         # 保存对话
-        await MessageDict().insert(key=trace_tree.root.conversation_id,value={
-                "role": "user",
-                "content": question})
-        await MessageDict().insert(key=trace_tree.root.conversation_id,value={
-                "role": "assistant",
-                "content": answer})
+        if question and answer:
+            await MessageDict().insert(key=trace_tree.root.conversation_id,value={
+                    "role": "user",
+                    "content": question})
+            await MessageDict().insert(key=trace_tree.root.conversation_id,value={
+                    "role": "assistant",
+                    "content": answer})
         message_dict_value = await MessageDict().query(key=trace_tree.root.conversation_id)
         L.debug(f"voice_chat MessageDict value:{json.dumps(message_dict_value, ensure_ascii=False)} conversation_id:{trace_tree.root.conversation_id}")
         await audio_queue.put(None) 
@@ -185,10 +79,185 @@ async def process_voice_conversation(
         L.debug(f"trace_tree: {trace_tree}")
         CANCELLATION_EVENTS.pop(trace_sn, None)
 
+async def image_handler(
+    file_path: str,
+    trace_sn: str,
+    audio_queue: asyncio.Queue,
+    cancellation_event: asyncio.Event,
+    trace_tree:TraceTree = TraceTree(),
+    req: Req[VCReqData] = None) -> Tuple[str, str]:
+    # 图像识别
+    question = ""
+    answer = await llm_and_tts(
+                question=question,
+                trace_sn=trace_sn,
+                audio_queue=audio_queue,
+                cancellation_event=cancellation_event,
+                trace_tree=trace_tree,
+                req=req,
+                file_path=file_path)
+    return question, answer
+
+async def audio_handler(
+    file_path: str,
+    trace_sn: str,
+    audio_queue: asyncio.Queue,
+    cancellation_event: asyncio.Event,
+    trace_tree:TraceTree = TraceTree(),
+    req: Req[VCReqData] = None) -> Tuple[str, str]:
+    # 语音识别
+    srt = SRTManager.create_srt()
+    srt_rsp: SRTRsp = await srt.recognize(audio_path=file_path)
+    
+    trace_srt = TraceSRT(
+        cost=srt_rsp.cost,
+        code=srt_rsp.code,
+        message=srt_rsp.message,
+        text=srt_rsp.text)
+    trace_tree.srt = trace_srt
+
+    if srt_rsp.code != 0:
+        L.error(f"voice_chat srt error trace_sn:{trace_sn} code:{srt_rsp.code} message:{srt_rsp.message}")
+        rsp = TTSRsp(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=srt_rsp.message)
+        await audio_queue.put(rsp)
+        return None, None
+    L.debug(f"voice_chat srt success trace_sn:{trace_sn} text:{srt_rsp.text} cost:{srt_rsp.cost}")
+    if len(srt_rsp.text.strip()) == 0:
+        L.error(f"voice_chat识别不到有效内容, trace_sn:{trace_sn}")
+        rsp = TTSRsp(
+            code=status.HTTP_400_BAD_REQUEST,
+            message="识别不到有效内容")
+        await audio_queue.put(rsp)
+        return None, None
+
+    # 问题预处理
+    router_start_time = time.perf_counter()
+    route = Route(
+        query_analyzer=QueryAnalyzer(
+            question=srt_rsp.text
+        )
+    )
+    await Router(route=route).router()
+    L.debug(f"voice_chat route trace_sn:{trace_sn} question:{srt_rsp.text} kb_result:{route.kb_result} cost:{int((time.perf_counter() - router_start_time) * 1000)}ms")
+
+    question = srt_rsp.text
+    answer = ""
+    if isinstance(route.kb_result, KBSearchResult):
+        L.debug(f"voice_chat kb_result trace_sn:{trace_sn} category_name:{route.kb_result.category_name}")
+        if route.kb_result.category_name == QuestionType.SONG.value:
+            song_file = SongPlayer().get_next_song(username=trace_tree.root.client_addr)
+            L.debug(f"voice_chat song trace_sn:{trace_sn} song_file:{song_file}")
+            with open(song_file, 'rb') as audio_file:
+                audio_data =  audio_file.read()
+                await audio_queue.put(TTSRsp(
+                    audio_data=audio_data,
+                    audio_format="mp3",
+                    stream_seq=1))
+                
+            # 发送结束标记
+            await audio_queue.put(TTSRsp(
+                stream_seq=-1))
+        else:
+            answer = route.kb_result.answer
+            llm_rsp_trunk = route.kb_result.answer
+            
+            # 处理 TTS
+            start_time = time.perf_counter()
+            tts = TTSManager.create_tts(trace_sn=trace_sn)
+            tts_rsp: TTSRsp = await tts.tts(text=llm_rsp_trunk)
+            L.debug(f"tts done trace_sn:{trace_sn} tts cost:{int((time.perf_counter() - start_time) * 1000)}ms tts_rsp.code:{tts_rsp.code}")
+            tts_rsp.stream_seq = 1  # 只有一个流
+            
+            if tts_rsp.code != 0:
+                L.error(f"tts error trace_sn:{trace_sn} code:{tts_rsp.code} message:{tts_rsp.message} audio_data len:{len(tts_rsp.audio_data)}")
+                rsp = TTSRsp(
+                    code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    message=tts_rsp.message)
+                await audio_queue.put(rsp)
+                return None, None
+            
+            # 放入音频数据
+            await audio_queue.put(tts_rsp)
+            
+            # 发送结束标记
+            rsp = TTSRsp(
+                stream_seq=-1)
+            await audio_queue.put(rsp)
+    else:
+        answer = await llm_and_tts(
+            question=question,
+            trace_sn=trace_sn,
+            audio_queue=audio_queue,
+            cancellation_event=cancellation_event,
+            trace_tree=trace_tree,
+            req=req)
+    return question, answer
+
+
+async def llm_and_tts(
+    question: str,
+    trace_sn: str,
+    audio_queue: asyncio.Queue,
+    cancellation_event: asyncio.Event,
+    trace_tree:TraceTree = TraceTree(),
+    req: Req[VCReqData] = None,
+    file_path: str = None) -> str:
+    answer = ""
+    chat_instance = Chat(content_type=req.data.content_type)
+    llm_start_time = time.perf_counter()
+    llm_index = 0
+    async for llm_rsp_trunk in chat_instance.chat_stream_by_sentence(
+            question=question,
+            trace_tree=trace_tree,
+            file_path=file_path,
+            req=req):
+        if llm_index == 0:
+            trace_tree.llm.first_cost = int((time.perf_counter() - llm_start_time) * 1000)
+        
+        # 流结束
+        if llm_rsp_trunk is None:
+            L.debug(f"chat_stream_by_sentence done trace_sn:{trace_sn} llm_index:{llm_index} llm_rsp_trunk:{llm_rsp_trunk}")
+            rsp = TTSRsp(
+                stream_seq=-1)
+            await audio_queue.put(rsp)
+            break
+        
+        answer += llm_rsp_trunk
+        llm_index += 1
+        L.debug(f"chat_stream_by_sentence trace_sn:{trace_sn} llm_rsp_trunk:{llm_rsp_trunk}")
+        
+        # 检查是否需要中断
+        if cancellation_event.is_set():
+            L.info(f"voice_chat cancelled during processing trace_sn:{trace_sn}")
+            break
+        
+        tts = TTSManager.create_tts(trace_sn=trace_sn)
+        tts_rsp: TTSRsp = await tts.tts(text=llm_rsp_trunk)
+        # 流状态
+        tts_rsp.stream_seq = llm_index
+        L.debug(f"tts done trace_sn:{trace_sn} tts_rsp:{tts_rsp} llm_index:{llm_index}")
+
+        if llm_index == 1:
+            trace_tree.tts = TraceTTS(first_cost=tts_rsp.cost)
+            
+        if tts_rsp.code != 0:
+            L.error(f"tts error trace_sn:{trace_sn} code:{tts_rsp.code} message:{tts_rsp.message} audio_data len:{len(tts_rsp.audio_data)}")
+            rsp = TTSRsp(
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message=tts_rsp.message)
+            await audio_queue.put(rsp)
+            return   
+        
+        # 等待队列有空位，再放入音频数据
+        await audio_queue.put(tts_rsp)
+    return answer
+
 async def voice_chat_ws(req: Req[VCReqData], trace_tree:TraceTree = None) -> AsyncGenerator[Resp, None]:
-    audio_data_bytes = base64.b64decode(req.data.audio_data)
+    data_bytes = base64.b64decode(req.data.content)
     try:
-        file_path = await save_audio_file(audio_data_bytes, req.message_id)
+        file_path = await save_upload_file(data_bytes, req.message_id)
         await validate_audio_file_size(file_path)
     except Exception as e:
         L.error(f"voice_chat HTTPException conversation_id:{req.conversation_id} message_id:{req.message_id} error:{e} stack:{traceback.format_exc()}")
@@ -209,7 +278,8 @@ async def voice_chat_ws(req: Req[VCReqData], trace_tree:TraceTree = None) -> Asy
                 trace_sn=req.message_id, 
                 audio_queue=audio_queue, 
                 cancellation_event=cancellation_event, 
-                trace_tree=trace_tree)
+                trace_tree=trace_tree,
+                req=req)
         except Exception as e:
             L.error(f"process_voice_conversation_wrapper error conversation_id:{req.conversation_id} message_id:{req.message_id} error:{e} stack:{traceback.format_exc()}")
             resp = TTSRsp(
@@ -288,7 +358,7 @@ async def voice_chat(
     trace_sn = trace_sn or get_id()
     content = await file.read()
     try:
-        file_path = await save_audio_file(content, trace_sn)
+        file_path = await save_upload_file(content, trace_sn)
         await validate_audio_file_size(file_path)
     except Exception as e:
         L.error(f"voice_chat HTTPException trace_sn:{trace_sn} error:{e} stack:{traceback.format_exc()}")
@@ -365,13 +435,6 @@ def get_file_extension(filename: str) -> str:
     return filename.split(".")[-1].lower()
 
 async def validate_audio_file_size(filepath:str):
-    """
-    验证上传的音频文件大小是否符合要求。
-
-    :param file: UploadFile 对象
-    :raises HTTPException: 如果验证失败，抛出相应的 HTTPException
-    """
-
     MAX_FILE_SIZE = 10 * 1024 * 1024  
 
     L.debug(f"validate_audio_file_size filepath:{filepath}")
@@ -384,14 +447,9 @@ async def validate_audio_file_size(filepath:str):
 
     return file_size
 
-async def save_audio_file(file_data: bytes, trace_sn: str) -> str:
-    """
-    保存音频文件到指定路径。
-
-    :param file_data: 上传的音频文件数据
-    :param trace_sn: 追踪标识
-    :return: 保存的文件路径
-    """
+async def save_upload_file(
+    file_data: bytes, 
+    trace_sn: str) -> str:
     os.makedirs(settings.UPLOAD_ROOT_PATH, exist_ok=True)
     saved_filename = get_filename(trace_sn)
     file_path = os.path.join(settings.UPLOAD_ROOT_PATH, saved_filename)
