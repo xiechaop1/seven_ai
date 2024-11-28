@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trace Log Query</title>
+    <style>
+        :root {
+            --primary-color: #1a73e8;
+            --text-color: #202124;
+            --border-color: #dadce0;
+            --hover-color: #f1f3f4;
+            --background-color: #ffffff;
+            --error-color: #d93025;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Google Sans', Arial, sans-serif;
+            color: var(--text-color);
+            line-height: 1.5;
+            background-color: #f8f9fa;
+        }
+
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .card {
+            background: var(--background-color);
+            border-radius: 8px;
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
+            margin-bottom: 24px;
+            padding: 24px;
+        }
+
+        .query-form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: flex-end;
+        }
+
+        .form-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 4px;
+            color: #5f6368;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 18px;
+            color: var(--text-color);
+            background-color: var(--background-color);
+            transition: border-color 0.2s;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 8px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 18px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #1557b0;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* 修改表格相关样式 */
+        table {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 1em 0;
+            background: var(--background-color);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th {
+            background-color: #f1f3f4;
+            color: #202124;
+            font-weight: 500;
+            text-align: left;
+            font-size: 18px;
+            position: relative;
+            user-select: none;
+            padding: 16px;
+            border-bottom: 2px solid #dadce0;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        td {
+            padding: 14px 16px;
+            font-size: 18px;
+            line-height: 1.5;
+            color: #202124;
+            vertical-align: top;
+            border-bottom: 1px solid #f1f3f4;
+        }
+
+        /* 斑马纹样式 */
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        tr:nth-child(odd) {
+            background-color: #ffffff;
+        }
+
+        /* 鼠标悬停效果 */
+        tbody tr:hover {
+            background-color: #f1f3f4;
+            transition: background-color 0.2s ease;
+        }
+
+        /* 调整列宽调整器样式 */
+        .resizer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 4px;
+            cursor: col-resize;
+            user-select: none;
+            height: 100%;
+            background-color: #dadce0;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        th:hover .resizer,
+        .resizing {
+            opacity: 1;
+        }
+
+        /* 更新表格中特定单元格的样式 */
+        td.answer-cell, 
+        td.tts-cell {
+            white-space: pre-wrap;
+            word-break: break-word;
+            min-width: 200px;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 18px;
+        }
+
+        /* 数字列居中对齐 */
+        td:nth-child(4),
+        td:nth-child(5),
+        td:nth-child(6),
+        td:nth-child(7),
+        td:nth-child(8) {
+            text-align: left;
+        }
+
+        /* 结果卡片样式优化 */
+        #resultsCard {
+            padding: 0;
+            overflow: auto;
+            border-radius: 8px;
+            background: transparent;
+            box-shadow: none;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            margin-top: 24px;
+        }
+
+        .pagination button {
+            background-color: transparent;
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+        }
+
+        .pagination button:hover {
+            background-color: rgba(26,115,232,0.04);
+        }
+
+        .pagination span {
+            font-size: 18px;
+            color: #5f6368;
+        }
+
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255,255,255,0.9);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            display: none;
+            z-index: 1000;
+        }
+
+        .error-message {
+            color: var(--error-color);
+            padding: 12px;
+            text-align: center;
+            display: none;
+        }
+
+        .custom-time {
+            display: none;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #5f6368;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 24px;
+            border-radius: 8px;
+            max-width: 80%;
+            max-height: 80%;
+            overflow: auto;
+            width: 90%;
+            max-width: 1200px;
+        }
+
+        .modal-close {
+            position: absolute;
+            right: 24px;
+            top: 24px;
+            cursor: pointer;
+            font-size: 20px;
+            color: #5f6368;
+        }
+
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .modal-header {
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 500;
+        }
+
+        .tts-response {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            font-family: monospace;
+        }
+
+        .tts-item {
+            padding: 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: #f8f9fa;
+        }
+
+        .tts-item-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            color: #5f6368;
+            font-size: 18px;
+        }
+
+        .tts-item-text {
+            margin-bottom: 8px;
+            font-size: 18px;
+            line-height: 1.5;
+        }
+
+        .tts-item-file {
+            font-size: 18px;
+            color: #1a73e8;
+            word-break: break-all;
+        }
+
+        /* 添加Answer列的样式 */
+        td.answer-cell {
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-width: none;
+        }
+
+        /* Add new styles for stats cards */
+        .stats-container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+        }
+
+        .stats-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,.3);
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .stats-card h3 {
+            color: #5f6368;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #5f6368;
+            margin-top: 4px;
+        }
+
+        .llm-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .llm-stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #f1f3f4;
+        }
+
+        .llm-model-name {
+            font-size: 14px;
+            color: #5f6368;
+        }
+
+        .llm-avg-time {
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--primary-color);
+        }
+
+        /* 添加自动刷新开关的样式 */
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--primary-color);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="query-form">
+                <div class="form-group">
+                    <label>Time Range</label>
+                    <select id="timeRange">
+                        <option value="today">Today</option>
+                        <option value="last_3_days">Last 3 Days</option>
+                        <option value="last_week">Last Week</option>
+                        <option value="last_month">Last Month</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                </div>
+                <div class="form-group custom-time">
+                    <label>Start Time</label>
+                    <input type="datetime-local" id="startTime">
+                </div>
+                <div class="form-group custom-time">
+                    <label>End Time</label>
+                    <input type="datetime-local" id="endTime">
+                </div>
+                <div class="form-group">
+                    <label>Message ID</label>
+                    <input type="text" id="messageId" placeholder="Enter message ID">
+                </div>
+                <div class="form-group">
+                    <label>Conversation ID</label>
+                    <input type="text" id="conversationId" placeholder="Enter conversation ID">
+                </div>
+                <div class="form-group auto-refresh">
+                    <label>Auto Refresh</label>
+                    <label class="switch">
+                        <input type="checkbox" id="autoRefresh">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <button onclick="query(1)" id="searchBtn">Search</button>
+            </div>
+        </div>
+
+        <!-- 移动统计卡片到这个位置 -->
+        <div class="stats-container" id="statsContainer" style="display: none;">
+            <div class="stats-card">
+                <h3>SRT Performance</h3>
+                <div class="stat-value" id="srtAvg">-</div>
+                <div class="stat-label">Average (ms)</div>
+            </div>
+            <div class="stats-card">
+                <h3>TTS Performance</h3>
+                <div class="stat-value" id="ttsAvg">-</div>
+                <div class="stat-label">Average (ms)</div>
+            </div>
+            <div class="stats-card" id="llmStatsContainer">
+                <h3>LLM Performance by Model</h3>
+                <div id="llmStats" class="llm-stats">
+                    <!-- LLM stats will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <div id="errorMessage" class="error-message"></div>
+
+        <div class="card" id="resultsCard" style="display: none;">
+            <div id="resultTable"></div>
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </div>
+
+    <div class="loading" id="loading">Loading...</div>
+
+    <div id="traceModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <pre id="modalContent"></pre>
+        </div>
+    </div>
+
+    <script>
+        let apiKey = '';
+        const PAGE_SIZE = 20;
+        let currentPage = 1;
+        let autoRefreshTimer = null;
+        const REFRESH_INTERVAL = 10000; // 10秒刷新一次
+
+        // 修改 window.onload 函数
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            apiKey = urlParams.get('key');
+            if (!apiKey) {
+                showError('API key is missing. Please provide a key parameter in the URL.');
+                document.getElementById('searchBtn').disabled = true;
+            } else {
+                // 页面加载完成后自动执行查询
+                query(1);
+            }
+        };
+
+        document.getElementById('timeRange').addEventListener('change', function(e) {
+            const customTimeFields = document.querySelectorAll('.custom-time');
+            customTimeFields.forEach(field => {
+                field.style.display = e.target.value === 'custom' ? 'block' : 'none';
+            });
+        });
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        async function query(page) {
+            hideError();
+            const loading = document.getElementById('loading');
+            loading.style.display = 'block';
+
+            const timeRange = document.getElementById('timeRange').value;
+            const requestData = {
+                key: apiKey,
+                page: page,
+                page_size: PAGE_SIZE,
+                time_range: timeRange,
+                conversation_id: document.getElementById('conversationId').value || undefined,
+                message_id: document.getElementById('messageId').value || undefined
+            };
+
+            if (timeRange === 'custom') {
+                requestData.start_time = document.getElementById('startTime').value;
+                requestData.end_time = document.getElementById('endTime').value;
+            }
+
+            try {
+                const response = await fetch('/api/v1/trace', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (data.items && data.items.length > 0) {
+                    displayResults(data);
+                    updatePagination(data.total, page);
+                    document.getElementById('resultsCard').style.display = 'block';
+                } else {
+                    document.getElementById('resultsCard').style.display = 'none';
+                    showError('No results found');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Failed to fetch data: ' + error.message);
+                // 发生错误时关闭自动刷新
+                document.getElementById('autoRefresh').checked = false;
+                stopAutoRefresh();
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        function displayResults(data) {
+            // Calculate and display statistics
+            const stats = calculateStats(data);
+            document.getElementById('srtAvg').textContent = `${stats.srtAvg}`;
+            document.getElementById('ttsAvg').textContent = `${stats.ttsAvg}`;
+            document.getElementById('statsContainer').style.display = 'flex'; // 显示统计容器
+
+            // Update LLM stats
+            const llmStatsHtml = stats.llmAvgs.map(stat => `
+                <div class="llm-stat-item">
+                    <span class="llm-model-name">${stat.model}</span>
+                    <span class="llm-avg-time">${stat.avg}ms</span>
+                </div>
+            `).join('');
+            document.getElementById('llmStats').innerHTML = llmStatsHtml;
+
+            // Original table rendering code
+            const table = document.getElementById('resultTable');
+            let html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 100px;">Time<div class="resizer"></div></th>
+                            <th style="width: 180px;">Conversation<div class="resizer"></div></th>
+                            <th style="width: 180px;">Message<div class="resizer"></div></th>
+                            <th style="width: 100px;">SRT<div class="resizer"></div></th>
+                            <th style="width: 100px;">LLM<div class="resizer"></div></th>
+                            <th style="width: 100px;">TTS<div class="resizer"></div></th>
+                            <th style="width: 400px;">Question<div class="resizer"></div></th>
+                            <th style="width: 400px;">Answer<div class="resizer"></div></th>
+                            <th style="width: 400px;">TTS Response<div class="resizer"></div></th>
+                            <th style="width: 120px;">Category<div class="resizer"></div></th>
+                            <th style="width: 120px;">Model<div class="resizer"></div></th>
+                            <th style="width: 100px;">ReqTokens<div class="resizer"></div></th>
+                            <th style="width: 100px;">RespTokens<div class="resizer"></div></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            data.items.forEach(item => {
+                const tree = item.trace_tree;
+                const ttsRespContent = tree.tts.resp_list.map(resp => 
+                    `${resp.stream_seq}. ${resp.text} (${resp.cost}ms, ${formatFileSize(resp.audio_file_size)})`
+                ).join('\n');
+                
+                html += `
+                    <tr>
+                        <td>${new Date(item.ts).toLocaleString()}</td>
+                        <td>${tree.root.conversation_id}</td>
+                        <td>${tree.root.message_id}</td>
+                        <td>${tree.root.srt_cost}ms</td>
+                        <td>${tree.root.llm_first_cost}ms</td>
+                        <td>${tree.root.tts_first_cost}ms</td>
+                        <td>${tree.srt.text}</td>
+                        <td class="answer-cell">${tree.llm.answer}</td>
+                        <td class="tts-cell">${ttsRespContent}</td>
+                        <td>${tree.qpp.question_category}</td>
+                        <td>${tree.llm.model}</td>
+                        <td>${tree.llm.req_tokens}</td>
+                        <td>${tree.llm.resp_tokens}</td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            table.innerHTML = html;
+        }
+
+        // 移除或注释掉原有的showModal中关于TTS Response的特殊处理
+        function showModal(title, content) {
+            const modal = document.getElementById('traceModal');
+            const modalContent = document.getElementById('modalContent');
+            let html = `<div class="modal-header">${title}</div><pre>${content}</pre>`;
+            modalContent.innerHTML = html;
+            modal.style.display = 'block';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('traceModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        function updatePagination(total, currentPage) {
+            const pagination = document.getElementById('pagination');
+            const totalPages = Math.ceil(total / PAGE_SIZE);
+            let html = '';
+
+            if (currentPage > 1) {
+                html += `<button onclick="query(${currentPage - 1})">Previous</button>`;
+            }
+
+            html += `<span>Page ${currentPage} of ${totalPages}</span>`;
+
+            if (currentPage < totalPages) {
+                html += `<button onclick="query(${currentPage + 1})">Next</button>`;
+            }
+
+            pagination.innerHTML = html;
+        }
+
+        // 添加列宽调整功能
+        document.addEventListener('DOMContentLoaded', function() {
+            const table = document.querySelector('table');
+            let isResizing = false;
+            let currentTh = null;
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isResizing) return;
+
+                const rect = table.getBoundingClientRect();
+                const tableLeft = rect.left;
+                const minWidth = 50;
+                const newWidth = Math.max(minWidth, e.clientX - tableLeft - currentTh.offsetLeft);
+                
+                currentTh.style.width = newWidth + 'px';
+            });
+
+            document.addEventListener('mouseup', function() {
+                isResizing = false;
+                currentTh = null;
+            });
+
+            // 为所有调整器添加事件监听
+            document.addEventListener('mousedown', function(e) {
+                if (e.target.className === 'resizer') {
+                    currentTh = e.target.parentElement;
+                    isResizing = true;
+                    e.preventDefault();
+                }
+            });
+        });
+
+        // Add new functions for statistics calculation
+        function calculateStats(data) {
+            // Calculate SRT average
+            const srtValues = data.items
+                .map(item => item.trace_tree.root.srt_cost)
+                .filter(cost => cost > 0);
+            const srtAvg = srtValues.length ? 
+                Math.round(srtValues.reduce((a, b) => a + b) / srtValues.length) : 0;
+
+            // Calculate TTS average
+            const ttsValues = data.items
+                .map(item => item.trace_tree.root.tts_first_cost)
+                .filter(cost => cost > 0);
+            const ttsAvg = ttsValues.length ?
+                Math.round(ttsValues.reduce((a, b) => a + b) / ttsValues.length) : 0;
+
+            // Calculate LLM averages by model
+            const llmByModel = {};
+            data.items.forEach(item => {
+                const model = item.trace_tree.llm.model;
+                const cost = item.trace_tree.root.llm_first_cost;
+                if (cost > 0) {
+                    if (!llmByModel[model]) {
+                        llmByModel[model] = { total: 0, count: 0 };
+                    }
+                    llmByModel[model].total += cost;
+                    llmByModel[model].count++;
+                }
+            });
+
+            const llmAvgs = Object.entries(llmByModel)
+                .filter(([model, stats]) => model && model.trim() !== '')
+                .map(([model, stats]) => ({
+                    model,
+                    avg: Math.round(stats.total / stats.count)
+                }));
+
+            return { srtAvg, ttsAvg, llmAvgs };
+        }
+
+        // 添加自动刷新控制逻辑
+        document.getElementById('autoRefresh').addEventListener('change', function(e) {
+            if (e.target.checked) {
+                // 开启自动刷新
+                startAutoRefresh();
+            } else {
+                // 关闭自动刷新
+                stopAutoRefresh();
+            }
+        });
+
+        function startAutoRefresh() {
+            if (autoRefreshTimer) return;
+            
+            // 立即执行一次查询
+            query(currentPage);
+            
+            // 设置定时器
+            autoRefreshTimer = setInterval(() => {
+                query(currentPage);
+            }, REFRESH_INTERVAL);
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshTimer) {
+                clearInterval(autoRefreshTimer);
+                autoRefreshTimer = null;
+            }
+        }
+
+        // 清理定时器
+        window.onunload = function() {
+            stopAutoRefresh();
+        };
+    </script>
+</body>
+</html>

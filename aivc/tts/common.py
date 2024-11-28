@@ -5,6 +5,7 @@ from enum import Enum
 class TTSRsp(BaseModel):
     code: int = 0
     message: str = ""
+    action: Optional[str] = None
     text: Optional[str] = None
     audio_format: Optional[str] = None
     sample_format: Optional[str] = None 

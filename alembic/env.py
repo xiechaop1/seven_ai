@@ -4,6 +4,8 @@ from sqlalchemy import pool
 from alembic import context
 from aivc.config.config import settings
 from aivc.common.kb import QuestionCategory, Question
+from aivc.common.chat import Conversation
+from aivc.common.trace_log import TraceLog
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -20,6 +22,8 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 target_metadata = QuestionCategory.metadata
 target_metadata = Question.metadata
+target_metadata = Conversation.metadata
+target_metadata = TraceLog.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

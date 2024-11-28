@@ -1,18 +1,19 @@
-from aivc.data.db import kb
-from aivc.data.db.pg_engine import engine
-from sqlmodel import Session
-from aivc.model.embed.embed import EmbedModel
+from aivc.chat.router import Router
+from aivc.common.route import Route
+from aivc.common.query_analyze import QueryAnalyzer
 
-def search_kb():
-    with Session(engine) as session:
-        vector = EmbedModel().embed("唱儿歌")
-        results = kb.search_similar_questions(
-            session=session,
-            vector=vector,
-            top_k=5
+
+async def test_search_kb():
+    result = await Router(
+        route = Route(
+            query_analyzer=QueryAnalyzer(
+                question="包头天气怎么样"
+            )
         )
-        for result in results:
-            print(result)
+    ).search_kb()
+    print(result)
 
-if __name__ == '__main__':
-    search_kb()
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(test_search_kb())
+

@@ -104,10 +104,6 @@
 <body>
     <div class="container">
         <audio id="audioId" width="100" height="50" autoplay></audio>
-        <div id="timer">00:00:000</div>
-        <button id="vadToggle">Enable Voice Auto Detection</button>
-        <button id="recordButton">Press and Hold to Chat</button>
-        <p>You can also hold the space bar to chat!</p>
         <div id="latencyMetrics">
             <table>
                 <tr>
@@ -126,6 +122,12 @@
         </div>
         <div id="status">Ready</div>
         <div id="conversationLog"></div>
+
+        <div id="timer">00:00:000</div>
+        <button id="vadToggle">Enable Voice Auto Detection</button>
+        <button id="recordButton">Press and Hold to Chat</button>
+        <p>You can also hold the space bar to chat!</p>
+
         <div id="logArea"></div>
         <input type="file" id="imageUpload" accept="image/*">
     </div>
@@ -483,13 +485,23 @@
         }
 
         function getId() {
-            const now = new Date()
-            const timestamp = now.toISOString()
-                .replace(/[-:]/g, '')
-                .replace('T', '-')
-                .replace(/\..+/, '')
-            const uuid = getConversationId()
-            return `${timestamp}-${uuid}`
+            // 获取当前时区的时间
+            const now = new Date();
+            const options = { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+            
+            // 格式化年月日时分秒毫秒
+            const year = now.toLocaleString('en', { ...options, year: 'numeric' });
+            const month = now.toLocaleString('en', { ...options, month: '2-digit' });
+            const day = now.toLocaleString('en', { ...options, day: '2-digit' });
+            const hour = now.toLocaleString('en', { ...options, hour: '2-digit', hour12: false }).padStart(2, '0');
+            const minute = now.toLocaleString('en', { ...options, minute: '2-digit' });
+            const second = now.toLocaleString('en', { ...options, second: '2-digit' });
+            const millisecond = String(now.getMilliseconds()).padStart(3, '0');
+
+            // 组合时间戳
+            const timestamp = `${year}${month}${day}-${hour}${minute}${second}${millisecond}`;
+            const uuid = getConversationId();
+            return `${timestamp}-${uuid}`;
         }
 
         function getConversationId() {

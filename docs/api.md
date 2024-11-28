@@ -59,6 +59,7 @@
 #### VCRespData结构
 | 参数 | 说明  | 数据格式|值|是否必填|
 |:------------- |:---------------| :---------------|  :---------------| :---------------| 
+| action      | 行动指令 |   字符串| take_photo|否 | 
 | text      | 文字内容 |   字符串| |否 | 
 | audio_data      | 音频数据 |   字符串|base64编码 |否 | 
 | audio_format      | 数据格式 |   字符串|pcm或mp3 |否 | 
@@ -78,7 +79,8 @@
   "code": 0,
   "message": "success",
   "data": {
-    "text": "就是。",
+    "action": "take_photo",
+    "text": "好的，我看一下",
     "sample_rate": 16000,
     "channels": 1,
     "sample_format": "S16LE",
@@ -117,6 +119,7 @@ class Req(BaseModel, Generic[DataT]):
     data: Optional[DataT] = None
 
 class VCRespData(BaseModel):
+    action: Optional[str] = None
     text: Optional[str] = ""
     audio_format: Optional[str] = "pcm"
     sample_rate: Optional[int] = None

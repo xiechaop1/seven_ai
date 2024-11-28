@@ -11,11 +11,13 @@ import inspect
 import traceback
 from aivc.chat.llm.common import LLMRsp
 from typing import AsyncGenerator
-import re
-from aivc.utils.message_dict import MessageDict
 import json
 import base64
 from aivc.common.chat import Req, VCReqData
+from aivc.common.route import Route
+import asyncio
+from aivc.chat import conversation
+from aivc.text.sentence_splitter import SentenceSplitter
 
 class Chat():
     def __init__(self, 
@@ -45,8 +47,11 @@ class Chat():
         messages = []
         L.debug(f"gen_messages conversation_id:{conversation_id}")
         if conversation_id:
-            messages = await MessageDict().query(key=conversation_id)
-            L.debug(f"gen_messages conversation_id:{conversation_id} MessageDict query messages:{messages}")
+            messages = await asyncio.to_thread(
+                conversation.get_conversation_history,
+                conversation_id=conversation_id
+            )
+            L.debug(f"gen_messages conversation_id:{conversation_id} query messages:{messages}")
             
         if len(prompt.system.strip()) > 0:
             messages.append({"role": "system", "content": prompt.system})
@@ -80,40 +85,40 @@ class Chat():
                 question: str,
                 related_data: str = "",
                 trace_tree:TraceTree=TraceTree(),
-                prompt:Prompt=Prompt(),
                 file_path: str="",
-                req: Req[VCReqData] = None) -> AsyncGenerator[str, None]:
+                req: Req[VCReqData] = None,
+                route:Route=None) -> AsyncGenerator[str, None]:
         if req.data.content_type == ContentType.IMAGE.value:
             async for chunk_message in self.chat_stream_image(
                 question=question,
                 related_data=related_data,
                 trace_tree=trace_tree,
-                prompt=prompt,
                 file_path=file_path,
-                req=req):
+                req=req,
+                route=route):
                 yield chunk_message
         else:
             async for chunk_message in self.chat_stream_text(
                 question=question,
                 related_data=related_data,
                 trace_tree=trace_tree,
-                prompt=prompt,
                 file_path=file_path,
-                req=req):
+                req=req,
+                route=route):
                 yield chunk_message
 
     async def chat_stream_text(self,
                 question: str,
                 related_data: str = "",
                 trace_tree:TraceTree=TraceTree(),
-                prompt:Prompt=Prompt(),
                 file_path: str="",
-                req: Req[VCReqData] = None) -> AsyncGenerator[str, None]:
+                req: Req[VCReqData] = None,
+                route:Route=None) -> AsyncGenerator[str, None]:
         start_time = time.perf_counter()
         messages = await self.gen_messages(
             question=question,
             related_data=related_data,
-            prompt=prompt,
+            prompt=route.prompt,
             conversation_id=trace_tree.root.conversation_id)
             
         prompt_tokens_local = LLMManager.get_message_token_length(
@@ -179,12 +184,13 @@ class Chat():
                 trace_tree:TraceTree=TraceTree(),
                 prompt:Prompt=Prompt(),
                 file_path: str="",
-                req: Req[VCReqData] = None) -> AsyncGenerator[str, None]:
+                req: Req[VCReqData] = None,
+                route:Route=None) -> AsyncGenerator[str, None]:
         
         start_time = time.perf_counter()
         messages = await self.gen_vision_messages(
                 img_path=file_path,
-                prompt=Prompt(user="你是一个儿童陪伴助手，用孩子能理解的语言，简洁明了的描述图片的内容。")
+                prompt=Prompt(user=question),
             )
         prompt_tokens_local = LLMManager.get_message_token_length(
             llm_type=self.llm_type,
@@ -241,87 +247,32 @@ class Chat():
         self,
         question: str,
         trace_tree: TraceTree = TraceTree(),
-        min_sentence_length: int = 20,
+        min_sentence_length: int = 10,
         file_path: str = "",
-        req: Req[VCReqData] = None) -> AsyncGenerator[str, None]:
-        """
-        通过 chat_stream 生成的消息流，按句子拆分并输出
-        """
-        buffer = ''
-        accumulated_sentence = ''  
-        first_sentence = True  
-
-        # 匹配以指定标点符号结尾的句子
-        sentence_end_re = re.compile(
-            r'(?<![("\[])(.*?)([.?!。？！，：]|\.{3,}|\n)(?![")\]])'
-        )
-        # 正则表达式，检查句子中是否包含至少一个中英文字符
-        valid_sentence_re = re.compile(r'[A-Za-z\u4e00-\u9fff]')
-
+        req: Req[VCReqData] = None,
+        route: Route = None
+    ) -> AsyncGenerator[str, None]:
+        L.debug(f"chat_stream_by_sentence start! trace_sn:{trace_tree.root.message_id} question:{question}")
+        splitter = SentenceSplitter(min_sentence_length)
         async for chunk in self.chat_stream(
-            question=question, 
+            question=question,
             trace_tree=trace_tree,
             file_path=file_path,
-            req=req):
+            req=req,
+            route=route
+        ):
             if chunk is None:
-                L.debug(f"chat_stream_by_sentence done trace_sn:{trace_tree.root.message_id} trunk:{chunk}")
                 break
-            if chunk:
-                buffer += str(chunk)
-                while True:
-                    match = sentence_end_re.search(buffer)
-                    if match:
-                        # 提取完整的句子，包括末尾标点
-                        sentence = match.group(1) + match.group(2)
-                        sentence = sentence.strip()
-                        # 更新缓冲区，移除已处理的句子
-                        buffer = buffer[match.end():]
+            
+            for sentence in splitter.add_chunk(chunk):
+                yield sentence
 
-                        # 检查句子是否包含至少一个中英文字符
-                        if valid_sentence_re.search(sentence):
-                            if first_sentence:
-                                # 第一个句子，忽略最小长度限制
-                                yield sentence
-                                first_sentence = False
-                            else:
-                                # 检查句子长度
-                                if accumulated_sentence:
-                                    # 已有累积的句子，拼接当前句子
-                                    accumulated_sentence += sentence
-                                    if len(accumulated_sentence) >= min_sentence_length:
-                                        yield accumulated_sentence
-                                        accumulated_sentence = ''
-                                    # 如果仍不满足长度，继续累积
-                                else:
-                                    if len(sentence) >= min_sentence_length:
-                                        yield sentence
-                                    else:
-                                        accumulated_sentence = sentence
-                        # 如果句子不包含中英文字符，则忽略
-                    else:
-                        break
- 
+        for sentence in splitter.finalize():
+            yield sentence
 
-        # 处理最后剩余的 buffer，如果有未完成的句子
-        if buffer.strip():
-            # 提取剩余的句子（可能不以标点结尾）
-            remaining_sentence = buffer.strip()
-            if valid_sentence_re.search(remaining_sentence):
-                if first_sentence:
-                    # 第一个句子仍然存在，忽略长度限制
-                    yield remaining_sentence
-                else:
-                    if accumulated_sentence:
-                        accumulated_sentence += remaining_sentence
-                    else:
-                        accumulated_sentence = remaining_sentence
-
-        # 如果有累积的句子，输出
-        if accumulated_sentence:
-            yield accumulated_sentence
-        # 结束
         yield None
 
+    
     async def chat(self,
                 question: str,
                 related_data: str = "",
@@ -344,7 +295,6 @@ class Chat():
         rsp_token_length = rsp.output_tokens
         L.debug(f"chat done trace_sn:{trace_tree.root.message_id} req_tokens_length:{req_tokens_length} rsp_tokens:{rsp_token_length} cost:{round(time.time() - start_time, 3)}")
         return rsp
-    
-    
-    
-     
+
+
+

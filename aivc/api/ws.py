@@ -3,7 +3,6 @@ from aivc.config.config import L,settings
 from aivc.common.chat import Req, VCMethod, Resp, VCReqData
 from aivc.api.voice_chat import voice_chat_ws
 import traceback
-from aivc.utils.message_dict import MessageDict
 from aivc.common.trace_tree import TraceTree, TraceRoot
 import typing
 
@@ -24,7 +23,7 @@ async def ws(websocket: WebSocket):
                 token = req_data.get("token", "")
                 method = req_data.get("method", "")
                 if method != VCMethod.PING:
-                    L.debug(f"ws method: {method} conversation_id: {conversation_id} message_id: {message_id} token: {token} rmt: {websocket.client.host}:{websocket.client.port}")
+                    L.debug(f"--*--ws message recv--*-- method: {method} conversation_id: {conversation_id} message_id: {message_id} token: {token} rmt: {websocket.client.host}:{websocket.client.port}")
 
                 if method == VCMethod.VOICE_CHAT:
                     req = Req[VCReqData](**req_data)
@@ -45,7 +44,7 @@ async def ws(websocket: WebSocket):
                         trace_tree = trace_tree,
                     ):
                         await websocket.send_json(resp.model_dump())
-                        L.debug(f"ws resp: {resp}")
+                        L.debug(f"--*--ws message resp--*--: {resp}")
                 else:
                     resp = await handle_request(req_data)
                     send_json = resp.model_dump() if hasattr(resp, 'model_dump') else resp
@@ -73,8 +72,7 @@ async def ws(websocket: WebSocket):
     finally:
         if not websocket.client_state.DISCONNECTED:
             await websocket.close(code=1012, reason="WebSocket closed")
-        await MessageDict().delete(conversation_id)
-        L.info(f"WebSocket closed finally {websocket.client.host:}:{websocket.client.port} conversation_id: {conversation_id} clean MessageDict")
+        L.info(f"WebSocket closed finally {websocket.client.host:}:{websocket.client.port} conversation_id: {conversation_id}")
 
 async def handle_request(req_data: typing.Any) -> typing.Any:
     conversation_id = req_data.get("conversation_id", "")

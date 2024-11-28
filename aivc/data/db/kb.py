@@ -58,7 +58,7 @@ def search_similar_questions(
     session: Session,
     vector: List[float], 
     top_k: int = 5,
-    threshold: float = -0.85
+    threshold: float = -0.83
 ) -> List[KBSearchResult]:
     session.exec(text("SET LOCAL enable_seqscan = OFF"))
     session.exec(text("SET LOCAL hnsw.ef_search = 20")) 
