@@ -152,6 +152,7 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = "CfzpN8uEDkFTw"
 
     SONG_DIR: str = os.path.join(PATH, "assets/song")
+    SOUND_DIR: str = os.path.join(PATH, "assets/sound")
 
 
 settings = Settings() 

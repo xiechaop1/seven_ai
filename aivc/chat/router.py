@@ -9,6 +9,7 @@ from aivc.model.embed.embed import EmbedModel
 from aivc.common.kb import KBSearchResult
 from typing import Optional
 from aivc.data.db import kb
+from aivc.chat.prompt_selector import PromptSelector
 
 
 class Router:
@@ -22,9 +23,12 @@ class Router:
         kb_result = await self.search_kb()
         self.route.kb_result = kb_result
         L.debug(f"router question:{self.route.query_analyzer.question} kb_result:{kb_result} cost:{int((time.perf_counter() - start_time) * 1000)}ms")
+        # 选择prompt
+        self.route.prompt = PromptSelector(kb_result=kb_result).select()
 
 
     async def search_kb(self) -> Optional[KBSearchResult]:
+        L.debug(f"search_kb question:{self.route.query_analyzer.question}")
         try:
             def sync_search():
                 try:

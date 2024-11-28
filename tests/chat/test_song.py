@@ -15,5 +15,23 @@ def test_code_decode():
         with open("audio_data.txt", "w") as f:
             f.write(audio_data)
 
+def play_mp3():
+    import pygame
+    pygame.mixer.init()
+    pygame.mixer.music.load(test_song_player())
+    pygame.mixer.music.play()
+    while pygame.mixer.music.get_busy():
+        pygame.time.Clock().tick(10)
+
+def play_mp3_v2():
+    from playsound import playsound
+    playsound(test_song_player())
+    
+def play_mp3_v3():
+    from pydub import AudioSegment
+    from pydub.playback import play
+    song = AudioSegment.from_mp3(test_song_player())
+    play(song)
+
 if __name__ == '__main__':
-    test_code_decode()
+    play_mp3_v3()

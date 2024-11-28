@@ -1,9 +1,9 @@
 from aivc.config.config import settings
 from aivc.utils.ip import IP
-from typing import Optional
 from aivc.utils.tools import get_time_str
 from pydantic import BaseModel, Field
 import json
+from typing import Optional
 
 class TraceRoot(BaseModel):
     ts: str = Field(default_factory=get_time_str)
@@ -22,6 +22,9 @@ class TraceRoot(BaseModel):
     tts_first_cost: int = 0
 
     total_price: float = 0.0
+
+    err_code: int = 0
+    err_message: str = ""
 
 class TraceQPP(BaseModel):
     question_category: str = ""
@@ -45,10 +48,19 @@ class TraceLLM(BaseModel):
     price: float = 0.0
 
 
+class TraceTTSResp(BaseModel):
+    text: Optional[str] = ""
+    audio_file: Optional[str] = ""
+    audio_file_size: Optional[int] = 0
+    cost: Optional[int] = 0
+    stream_seq: Optional[int] = 0
+
 class TraceTTS(BaseModel):
     first_cost: int = 0
     cost: int = 0
-
+    resp_list: list[TraceTTSResp] = []
+    price: float = 0.0
+    
 class TraceTree(BaseModel):
     root: TraceRoot = Field(default_factory=TraceRoot)
     qpp: TraceQPP = Field(default_factory=TraceQPP)

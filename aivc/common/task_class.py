@@ -2,9 +2,13 @@ from typing import List
 from enum import Enum
 
 class QuestionType(Enum):
+    DEFAULT = 'default'
     ABOUT = 'about'
     SUPPORT = 'support'
     SONG = 'song'
+    TAKE_PHOTO = 'take_photo'
+    PHOTO_RECOGNITION = 'photo_recognition'
+    WEATHER = 'weather'
 
 QuestionWithAnswer = [QuestionType.ABOUT.value, QuestionType.SUPPORT.value]
 
@@ -34,33 +38,4 @@ class TaskClass:
             "keywords": self.keywords,
             "vector": self.vector
         }
-    
-class TCData:
-    _instance = None
-    task_vectors = None
-    
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
-    DEFAULT = "default"
-    ABOUT = "about"
-
-    BUILT_IN_QUESTION = [
-        "介绍下自己",
-    ]
-
-    task_classes:List[TaskClass] =  [
-        TaskClass(
-            name = ABOUT,
-            similar_words = [
-                "你的名字", "你是什么", "你来自哪里", 
-                "你是谁呀", "你叫什么名字", "你是机器人吗",
-                "介绍一下你自己", "你能干什么", "你会做什么",
-                "我想认识你", "和我说说你吧", "你好厉害啊是谁呀"
-            ],
-            keywords =  ["自我介绍"]            
-        )
-    ]
 

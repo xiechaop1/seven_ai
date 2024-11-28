@@ -2,6 +2,17 @@ import requests
 import netifaces
 import ipaddress
 
+def is_private_ip(ip_address: str) -> bool:
+    ip = ipaddress.ip_address(ip_address)
+    return (
+        ip.is_private or
+        ip.is_loopback or
+        ip.is_link_local or
+        ip.is_multicast or
+        ip.is_reserved or
+        ip.is_unspecified
+    )
+
 def get_local_address(interfaces:list=["eth0", "en0"]):
     m = local_addresses()
     for itf in interfaces:

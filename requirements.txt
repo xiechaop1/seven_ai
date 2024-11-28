@@ -32,3 +32,4 @@ psycopg2-binary
 zhipuai
 aiohttp
 aiofiles
+xdbSearcher

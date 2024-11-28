@@ -3,6 +3,9 @@ import tiktoken
 from aivc.chat.llm.providers.openai_llm import OpenAILLM
 from typing import Optional, TypeVar, Generic
 from enum import Enum
+from sqlmodel import SQLModel, Field
+from sqlalchemy import Index
+from datetime import datetime
 
 class VCMethod(str, Enum):
     VOICE_CHAT = "voice-chat"
@@ -30,7 +33,8 @@ class Req(BaseModel, Generic[DataT]):
     data: Optional[DataT] = None
 
 class VCRespData(BaseModel):
-    text: Optional[str] = ""
+    action: Optional[str] = None
+    text: Optional[str] = None
     audio_format: Optional[str] = "pcm"
     sample_rate: Optional[int] = None
     channels: Optional[int] = None
@@ -91,3 +95,25 @@ def trim_prompt_to_length(
     else:
         trimmed_prompt = prompt
     return trimmed_prompt
+
+
+class Conversation(SQLModel, table=True):
+    __tablename__ = "conversations"
+    
+    id: int = Field(primary_key=True) 
+    ts: datetime = Field(nullable=False)
+    conversation_id: str = Field(nullable=False)
+    role: str = Field(nullable=False)
+    content: str = Field(nullable=False)
+    question_type: str = Field(nullable=True)
+    
+    __table_args__ = (
+        # 复合索引:对话ID+id
+        Index("idx_conv_id", "conversation_id", "id"),\
+    )
+
+class HandlerResult:
+    def __init__(self, question: str, answer: str, question_type: str):
+        self.question = question
+        self.answer = answer
+        self.question_type = question_type
