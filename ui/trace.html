@@ -133,6 +133,9 @@
             color: #202124;
             vertical-align: top;
             border-bottom: 1px solid #f1f3f4;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-width: none;
         }
 
         /* 斑马纹样式 */
@@ -648,7 +651,8 @@
                             <th style="width: 100px;">SRT<div class="resizer"></div></th>
                             <th style="width: 100px;">LLM<div class="resizer"></div></th>
                             <th style="width: 100px;">TTS<div class="resizer"></div></th>
-                            <th style="width: 400px;">Question<div class="resizer"></div></th>
+                            <th style="width: 250px;">Client<div class="resizer"></div></th>
+                            <th style="width: 200px;">Question<div class="resizer"></div></th>
                             <th style="width: 400px;">Answer<div class="resizer"></div></th>
                             <th style="width: 400px;">TTS Response<div class="resizer"></div></th>
                             <th style="width: 120px;">Category<div class="resizer"></div></th>
@@ -663,7 +667,7 @@
             data.items.forEach(item => {
                 const tree = item.trace_tree;
                 const ttsRespContent = tree.tts.resp_list.map(resp => 
-                    `${resp.stream_seq}. ${resp.text} (${resp.cost}ms, ${formatFileSize(resp.audio_file_size)})`
+                    `${resp.stream_seq}. ${resp.text} (${resp.cost}ms, ${formatFileSize(resp.audio_file_size)}, ${resp.send_timestamp})`
                 ).join('\n');
                 
                 html += `
@@ -674,7 +678,8 @@
                         <td>${tree.root.srt_cost}ms</td>
                         <td>${tree.root.llm_first_cost}ms</td>
                         <td>${tree.root.tts_first_cost}ms</td>
-                        <td>${tree.srt.text}</td>
+                        <td>${tree.root.client_addr}</td>
+                        <td><a href="/upload/${tree.root.message_id}" target="_blank">${tree.srt.text}</a></td>
                         <td class="answer-cell">${tree.llm.answer}</td>
                         <td class="tts-cell">${ttsRespContent}</td>
                         <td>${tree.qpp.question_category}</td>

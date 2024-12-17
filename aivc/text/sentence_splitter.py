@@ -16,10 +16,10 @@ class SentenceSplitter:
         """获取当前输出句子序号对应的目标长度"""
         if sentence_number == 1:
             return self.min_sentence_length
-        elif sentence_number == 2:
+        elif sentence_number in (2, 3, 4):
             return int(self.min_sentence_length)
         else:
-            return int(self.min_sentence_length * (sentence_number - 1) * 3)
+            return int(self.min_sentence_length * (sentence_number - 4) * 2)
 
     def add_chunk(self, chunk: str) -> str:
         if not chunk:
@@ -43,7 +43,7 @@ class SentenceSplitter:
 
             # 获取当前目标长度
             target_length = self.get_target_length(self.output_sentence_number + 1)
-            print(f"number: {self.input_sentence_number}, output sentence number: {self.output_sentence_number + 1}, target length: {target_length} sentence: {sentence} self.pending: {self.pending}")
+            # print(f"number: {self.input_sentence_number}, output sentence number: {self.output_sentence_number + 1}, target length: {target_length} sentence: {sentence} self.pending: {self.pending}")
 
             # 第一句直接输出
             if self.output_sentence_number == 0:
@@ -53,9 +53,15 @@ class SentenceSplitter:
 
             # 当前句子自身就超过目标长度的2倍，需要强制切分
             if len(sentence) > target_length * 2:
-                forced_sentences = [sentence[i:i + target_length] for i in range(0, len(sentence), target_length)]
-                result.extend([(s, False) for s in forced_sentences])
-                self.output_sentence_number += len(forced_sentences)
+                # 只取第一个目标长度的片段
+                first_part = sentence[:target_length]
+                remaining_part = sentence[target_length:]
+                result.append(first_part)
+                self.output_sentence_number += 1
+                
+                # 剩余部分加入pending
+                if remaining_part:
+                    self.pending.append(remaining_part)
                 continue
 
             # 添加到pending并检查长度

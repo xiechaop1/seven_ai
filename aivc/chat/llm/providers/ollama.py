@@ -14,7 +14,7 @@ class OllamaLLM(BaseLLM):
     tokenizer = None
 
     PROVIDER = "ollama"
-    base_url = "http://localhost:11434/v1/"
+    base_url = "http://192.168.0.19:11434/v1/"
     # required but ignored
     API_KEY = "ollama" 
 
@@ -22,8 +22,9 @@ class OllamaLLM(BaseLLM):
     LLAMA3_CHATQA_8B = "llama3-chatqa:latest"
     # https://ollama.com/library/command-r
     COMMAND_R = "command-r:latest"
-    # https://ollama.com/library/qwen:32b
-    QWEN_1_5 = "qwen2:1.5b"
+    # https://ollama.com/library/qwen2.5:0.5b
+    QWEN_25_05B = "qwen2.5:0.5b"
+    QWEN_25_3B = "qwen2.5:3b"
 
     MODELS = {
         LLAMA3_CHATQA_8B: ModelInfo(
@@ -42,14 +43,21 @@ class OllamaLLM(BaseLLM):
                 output=0
             )
         ),
-        QWEN_1_5: ModelInfo(
-            name=QWEN_1_5,
-            context_size=32000-2000,
+        QWEN_25_05B: ModelInfo(
+            name=QWEN_25_05B,
+            context_size=128000-2000,
             pricing=PricingInfo(
                 input=0,
                 output=0
-            ),
-            local_path="Qwen2-1.5B-Instruct-GPTQ-Int4"
+            )
+        ),
+        QWEN_25_3B: ModelInfo(
+            name=QWEN_25_3B,
+            context_size=128000-2000,
+            pricing=PricingInfo(
+                input=0,
+                output=0
+            )
         )
         }
 

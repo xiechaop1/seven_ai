@@ -49,7 +49,7 @@ class WeatherService:
         # TODO: get city from question by 大模型
         city = await city_location.get_city(question)
         L.info(f"get_location question: {question}, city: {city}")
-        if city:
+        if len(city.strip()) > 0:
             location = await city_location.get_city_location(city)
             return location
         else:

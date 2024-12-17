@@ -1,65 +1,38 @@
 import os
 from aivc.chat.llm.base import BaseLLM
 from aivc.chat.llm.common import PricingInfo, ModelInfo, LLMRsp
-from zhipuai import ZhipuAI
+from openai import OpenAI,AsyncOpenAI
 from typing import List, Dict, Any
+from aivc.config.config import settings,L
 import time
-from aivc.config.config import settings, L
-import asyncio
+ 
+class StepLLM(BaseLLM):
+    PROVIDER = "Step"
+    API_KEY_ENV = "STEP_KEY"
+    base_url = "https://api.stepfun.com/v1"
 
-class ZhiPuLLM(BaseLLM):
-    base_url = "https://open.bigmodel.cn/api/paas/v4/"
-    PROVIDER = "zhipu"
-    API_KEY_ENV = "ZHIPU_KEY"
-
-    GLM_4 = "glm-4"
-    GLM_3 = "glm-3-turbo"
-    GLM_4V_PLUS = "glm-4v-plus"
-    GLM_4_FLASHX = "glm-4-flashx"
-    GLM_4V_FlASH = "glm-4v-flash"	
+    STEP_1_32K = "step-1-32k"
+    STEP_15V_MIMI = "step-1.5v-mini"
 
     MODELS = {
-        GLM_4: ModelInfo(
-            name=GLM_4,
-            context_size=128000-2000,
+        STEP_1_32K: ModelInfo(
+            name=STEP_1_32K,
+            context_size=32000-2000,
             pricing=PricingInfo(
-                input=100/settings.M,
-                output=100/settings.M
+                input=15/settings.M,
+                output=70/settings.M
             )
         ),
-        GLM_3: ModelInfo(
-            name=GLM_3,
-            context_size=128000-2000,
+        STEP_15V_MIMI: ModelInfo(
+            name=STEP_15V_MIMI,
+            context_size=32000-2000,
             pricing=PricingInfo(
-                input=1/settings.M,
-                output=1/settings.M
+                input=8/settings.M,
+                output=35/settings.M
             )
-        ),
-        GLM_4V_PLUS: ModelInfo(
-            name=GLM_4V_PLUS,
-            context_size=128000-2000,
-            pricing=PricingInfo(
-                input=10/settings.M,
-                output=10/settings.M
-            )
-        ),
-        GLM_4_FLASHX: ModelInfo(
-            name=GLM_4_FLASHX,
-            context_size=128000-2000,
-            pricing=PricingInfo(
-                input=10/settings.M,
-                output=10/settings.M
-            )   
-        ),
-        GLM_4V_FlASH: ModelInfo(
-            name=GLM_4V_FlASH,
-            context_size=128000-2000,
-            pricing=PricingInfo(
-                input=0/settings.M,
-                output=0/settings.M
-            )   
         )
     }
+
 
     def __init__(self, name: str, timeout=60):
         if name not in self.MODELS:
@@ -67,7 +40,13 @@ class ZhiPuLLM(BaseLLM):
         self._name = name
         self._timeout = timeout
 
-        self._client = ZhipuAI(
+        self._client = OpenAI(
+            api_key = self.get_api_key(),
+            base_url=self.base_url,
+            timeout=self._timeout
+        )
+
+        self._async_client = AsyncOpenAI(
             api_key = self.get_api_key(),
             base_url=self.base_url,
             timeout=self._timeout
@@ -107,7 +86,7 @@ class ZhiPuLLM(BaseLLM):
 
     async def async_req(self, messages: List[Dict[str, Any]]) -> LLMRsp:
         start_time = time.time()
-        response = self._client.chat.asyncCompletions.create(
+        response = await self._async_client.chat.completions.create(
             model=self._name,
             messages=messages)
         
@@ -124,20 +103,23 @@ class ZhiPuLLM(BaseLLM):
         return result
 
     async def async_req_stream(self, messages: List[Dict[str, Any]]):
-        # stream = self._client.chat.asyncCompletions.create(
-        #     model=self._name,
-        #     messages=messages,
-        #     stream=True)
-        stream = await asyncio.to_thread(
-                self._client.chat.completions.create,
-                model=self._name,
-                messages=messages,
-                stream=True
-            )
+        stream = await self._async_client.chat.completions.create(
+            model=self._name,
+            messages=messages,
+            stream=True)
+
         result = ""
-        for chunk in stream:
-            chunk_content = chunk.choices[0].delta.content
+        async for chunk in stream:
+            choice = chunk.choices[0]
+            chunk_content = choice.delta.content
+            finish_reason = choice.finish_reason
+            # L.debug(f"{self.PROVIDER} async chunk:{chunk_content}")
             yield chunk_content
+            # 如果是最后一个chunk，结束循环
+            if finish_reason is not None:
+                L.debug(f"{self.PROVIDER} async finish_reason:{finish_reason}")
+                yield None
+                break
             if isinstance(chunk_content, str):
                 result += chunk_content
         L.debug(f"{self.PROVIDER} async response:{result}  model:{self._name}")
@@ -156,6 +138,6 @@ class ZhiPuLLM(BaseLLM):
                 output_tokens:int) -> float:
         pricing = self.pricing()
         return pricing.input * input_tokens + pricing.output * output_tokens
-
+    
     def select_model_by_length(self, length: int, model_name: str) -> str:
         return model_name

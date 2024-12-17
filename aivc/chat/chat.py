@@ -3,9 +3,15 @@ import time
 from aivc.config.config import L, settings
 from aivc.common.trace_tree import TraceTree
 from aivc.text.parse import gen_text
-from aivc.chat.llm.providers.deepseek import DeepSeekLLM
-from aivc.chat.llm.providers.zhipu import ZhiPuLLM
+# from aivc.chat.llm.providers.deepseek import DeepSeekLLM
+# from aivc.chat.llm.providers.zhipu import ZhiPuLLM
+from aivc.chat.llm.providers.step import StepLLM
+# from aivc.chat.llm.providers.doubao import DouBaoLLM
 # from aivc.chat.llm.providers.moonshot import MoonShotLLM
+# from aivc.chat.llm.providers.siliconflow import SiliconFlowLLM
+# from aivc.chat.llm.providers.baichuan import BaiChuanLLM
+# from aivc.chat.llm.providers.ollama import OllamaLLM
+from aivc.chat.llm.providers.zhipu import ZhiPuLLM
 from aivc.chat.llm.manager import LLMManager,LLMType
 import inspect
 import traceback
@@ -21,16 +27,20 @@ from aivc.text.sentence_splitter import SentenceSplitter
 
 class Chat():
     def __init__(self, 
-                llm_type:LLMType=LLMType.DEEPSEEK,
-                model_name:str=DeepSeekLLM.DEEPSEEK_CHAT,
+                # llm_type:LLMType=LLMType.DEEPSEEK,
+                # model_name:str=DeepSeekLLM.DEEPSEEK_CHAT,
+                llm_type:LLMType=LLMType.ZhiPu,
+                model_name:str=ZhiPuLLM.GLM_4_FLASHX,                
                 timeout:int=60,
                 prompt_style:str="thorough",
                 content_type:str=ContentType.AUDIO.value):
         self.llm_type = llm_type
         self.model_name = model_name
         if content_type == ContentType.IMAGE.value:
+            # self.llm_type = LLMType.STEP
+            # self.model_name = StepLLM.STEP_15V_MIMI
             self.llm_type = LLMType.ZhiPu
-            self.model_name = ZhiPuLLM.GLM_4V_PLUS
+            self.model_name = ZhiPuLLM.GLM_4V_FlASH
         self.llm = LLMManager.create_llm(self.llm_type, self.model_name, timeout)
         self.timeout = timeout
         self.prompt_style = prompt_style
@@ -43,7 +53,7 @@ class Chat():
                 conversation_id: str = "") -> list:
         result = gen_text(prompt.user, related_data=related_data, question=question)
 
-        # 多轮对话
+        #  多轮对话 
         messages = []
         L.debug(f"gen_messages conversation_id:{conversation_id}")
         if conversation_id:
@@ -54,7 +64,7 @@ class Chat():
             L.debug(f"gen_messages conversation_id:{conversation_id} query messages:{messages}")
             
         if len(prompt.system.strip()) > 0:
-            messages.append({"role": "system", "content": prompt.system})
+            messages.insert(0, {"role": "system", "content": prompt.system})
         messages.append({"role": "user", "content": result})
         return messages
 
@@ -65,6 +75,8 @@ class Chat():
         messages = []
         with open(img_path, 'rb') as img_file:
             img_base = base64.b64encode(img_file.read()).decode('utf-8')
+            img_type = img_path.split('.')[-1]
+            img_str = f"data:image/{img_type};base64,{img_base}"
             content_list  = []
             if len(prompt.user.strip()) > 0:
                 content_list.append({
@@ -74,7 +86,7 @@ class Chat():
             content_list.append({
                 "type": "image_url",
                 "image_url": {
-                    "url": img_base
+                    "url": img_str
                 }
             })
             messages.append({"role": "user", "content": content_list})
@@ -130,7 +142,7 @@ class Chat():
         if model_name != self.model_name:
             self.llm = LLMManager.create_llm(self.llm_type, model_name, self.timeout)
             L.debug(f"chat_stream select_model_by_length trace_sn:{trace_tree.root.message_id} messages len:{len(messages)} prompt_tokens_local:{prompt_tokens_local} change model:{self.model_name}->{model_name}")
-        L.debug(f"chat_stream start! trace_sn:{trace_tree.root.message_id} messages:{json.dumps(messages, indent=2, ensure_ascii=False)} prompt_tokens_local:{prompt_tokens_local}")
+        L.debug(f"chat_stream start! trace_sn:{trace_tree.root.message_id} messages:{json.dumps(messages, indent=2, ensure_ascii=False)} prompt_tokens_local:{prompt_tokens_local} model_name:{model_name}")
 
         i = 0
         answer = ""
@@ -145,10 +157,10 @@ class Chat():
                     L.debug(f"chat_stream first rsp trace_sn:{trace_tree.root.message_id} cost:{duration}")
                 i += 1
 
+                trace_tree.llm.model = model_name
                 if chunk_message is None:   
                     L.debug(f"chat_stream done trace_sn:{trace_tree.root.message_id} chunk_message:{chunk_message} answer:{answer} cost:{duration}")
                     completion_tokens_local = LLMManager.get_token_length(llm_type=self.llm_type, text=answer)
-                    trace_tree.llm.model = model_name
                     trace_tree.llm.req_tokens = prompt_tokens_local
                     trace_tree.llm.resp_tokens = completion_tokens_local
                     trace_tree.llm.cost = duration
@@ -210,10 +222,10 @@ class Chat():
                     L.debug(f"chat_stream first rsp trace_sn:{trace_tree.root.message_id} cost:{duration}")
                 i += 1
 
+                trace_tree.llm.model = self.model_name
                 if not chunk_message:
                     L.debug(f"chat_stream done trace_sn:{trace_tree.root.message_id} chunk_message:{chunk_message} cost:{duration}")
                     completion_tokens_local = LLMManager.get_token_length(llm_type=self.llm_type, text=rsp_text)
-                    trace_tree.llm.model = self.model_name
                     trace_tree.llm.req_tokens = prompt_tokens_local
                     trace_tree.llm.resp_tokens = completion_tokens_local
                     trace_tree.llm.cost = duration

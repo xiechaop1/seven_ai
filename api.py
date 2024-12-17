@@ -11,6 +11,7 @@ app = FastAPI()
 
 app.mount("/ui", StaticFiles(directory="ui"), name="ui")
 app.mount("/doc", StaticFiles(directory="docs"), name="docs")
+app.mount("/upload", StaticFiles(directory="upload"), name="upload")
 
 @app.get("/")
 def read_root():

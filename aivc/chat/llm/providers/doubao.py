@@ -20,20 +20,20 @@ class DouBaoLLM(BaseLLM):
 
     doubao_api_key = APIKey(api_key="", expire_time=0)
 
-    LITE_4K = "lite-4k"
-    LITE_32K = "lite-32k"
-    LITE_128K = "lite-128k"
-    PRO_4K = "pro-4k"
-    PRO_32K = "pro-32k"
-    PRO_128K = "pro-128k"
+    LITE_4K = "doubao-lite-4k"
+    LITE_32K = "doubao-lite-32k"
+    LITE_128K = "doubao-lite-128k"
+    # PRO_4K = "pro-4k"
+    # PRO_32K = "pro-32k"
+    # PRO_128K = "pro-128k"
 
     MODELS_REQ_NAME = {
-        LITE_4K: "ep-20240520020741-pfxnc",
-        LITE_32K: "ep-20240520020956-k9vgq",
-        LITE_128K: "ep-20240520021014-vrdzj",
-        PRO_4K: "ep-20240520021038-pft6f",
-        PRO_32K: "ep-20240520021053-sznd6",
-        PRO_128K: "ep-20240520021109-x7nqr"
+        LITE_4K: "ep-20241125151815-rxwpv",
+        LITE_32K: "ep-20241125151620-4tpx9",
+        LITE_128K: "ep-20241125151713-s74ff",
+        # PRO_4K: "ep-20240520021038-pft6f",
+        # PRO_32K: "ep-20240520021053-sznd6",
+        # PRO_128K: "ep-20240520021109-x7nqr"
     }
 
     MODELS = {
@@ -61,30 +61,30 @@ class DouBaoLLM(BaseLLM):
                 output=1/settings.M
             )
         ),
-        PRO_4K: ModelInfo(
-            name=PRO_4K,
-            context_size=4000,
-            pricing=PricingInfo(
-                input=0.8/settings.M,
-                output=2/settings.M
-            )
-        ),
-        PRO_32K: ModelInfo(
-            name=PRO_32K,
-            context_size=32000,
-            pricing=PricingInfo(
-                input=0.8/settings.M,
-                output=2/settings.M
-            )
-        ),
-        PRO_128K: ModelInfo(
-            name=PRO_128K,
-            context_size=128000,
-            pricing=PricingInfo(
-                input=5/settings.M,
-                output=9/settings.M
-            )
-        )
+        # PRO_4K: ModelInfo(
+        #     name=PRO_4K,
+        #     context_size=4000,
+        #     pricing=PricingInfo(
+        #         input=0.8/settings.M,
+        #         output=2/settings.M
+        #     )
+        # ),
+        # PRO_32K: ModelInfo(
+        #     name=PRO_32K,
+        #     context_size=32000,
+        #     pricing=PricingInfo(
+        #         input=0.8/settings.M,
+        #         output=2/settings.M
+        #     )
+        # ),
+        # PRO_128K: ModelInfo(
+        #     name=PRO_128K,
+        #     context_size=128000,
+        #     pricing=PricingInfo(
+        #         input=5/settings.M,
+        #         output=9/settings.M
+        #     )
+        # )
     }
 
     def __init__(self, name: str, timeout=60):

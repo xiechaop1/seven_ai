@@ -23,8 +23,9 @@
 ####  VCReqData结构
 | 参数 | 说明  | 数据格式|缺省值|是否必填|
 |:------------- |:---------------| :---------------|  :---------------| :---------------| 
-| content_type      | 数据格式 |   字符串|audio或image |是 | 
-| content      | 数据 |   字符串|base64编码 |是 | 
+| content_type      | 数据格式 |   字符串|audio\|image\|text |是 | 
+| content      | 数据 |   字符串|audio或image采用base64编码,text明码 |是 | 
+| tts_audio_format      | 数据 |   字符串|pcm / ogg_opus / mp3，默认为 pcm |否 | 
 
 #### 请求示例
 ```
@@ -37,7 +38,8 @@
   "timestamp": "2024-10-31T09:49:09.761387+08:00",
   "data": {
     "content_type": "audio",
-    "content": "JQIkA4MBxv+p/xT/Sv3U/Ir/yQLtBOgDqv9O/Hz7oP0QAZAC9gKeAngAXf5o/Fr9NgGlA/kCOADx/Tb+P/96/7b/OgFdAzUCwv1Z+iv7jADABaYFfwFH/E36T/wj/2EBRQM0BMwCm/4C+xv7JP4OAWwDPQRXAg=="
+    "content": "JQIkA4MBxv+p/xT/Sv3U/Ir/yQLtBOgDqv9O/Hz7oP0QAZAC9gKeAngAXf5o/Fr9NgGlA/kCOADx/Tb+P/96/7b/OgFdAzUCwv1Z+iv7jADABaYFfwFH/E36T/wj/2EBRQM0BMwCm/4C+xv7JP4OAWwDPQRXAg==",
+    "tts_audio_format":"ogg_opus"
   }
 }
 ```
@@ -102,10 +104,12 @@ class VCMethod(str, Enum):
 class ContentType(str, Enum):
     AUDIO = "audio"
     IMAGE = "image"
+    TEXT = "text"
 
 class VCReqData(BaseModel):
-    content_type: Optional[str] = ContentType.AUDIO.value  # audio or image
-    content: Optional[str] = "" # base64 encoded data
+    content_type: Optional[str] = ContentType.AUDIO.value  # audio|image|text
+    content: Optional[str] = "" # audio|image base64 encoded data
+    tts_audio_format: Optional[str] = "pcm" # pcm|ogg_opus|mp3
 
 DataT = TypeVar("DataT")
 

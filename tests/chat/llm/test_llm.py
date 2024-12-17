@@ -1,4 +1,4 @@
-from aivc.chat.llm.manager import LLMType, OpenAILLM, WenxinLLM, QWenLLM, ZhiPuLLM, MoonShotLLM, DeepSeekLLM, OllamaLLM
+from aivc.chat.llm.manager import LLMType, OpenAILLM, WenxinLLM, QWenLLM, ZhiPuLLM, MoonShotLLM, DeepSeekLLM, OllamaLLM, DouBaoLLM, StepLLM, BaiChuanLLM
 from aivc.chat.chat import Chat
 from aivc.chat.llm.manager import LLMManager
 import time
@@ -8,9 +8,12 @@ from aivc.utils.tools import remove_outside_curly_brackets
 import asyncio
 from aivc.common.chat import Prompt
 import traceback
+from aivc.chat.prompt_selector import PromptTemplate
 
 def generate_message(question="hello"):
-    return Chat().gen_messages(question=question)
+    return Chat().gen_messages(
+        question=question,
+        prompt= PromptTemplate.QA_PROMPT)
 
 def generate_vision_message():
     return Chat().gen_vision_messages(
@@ -85,10 +88,18 @@ def test_llm_moonshot(question: str=""):
 def test_llm_deepseek(question: str=""):
     test_llm(llm_type=LLMType.DEEPSEEK, name=DeepSeekLLM.DEEPSEEK_CHAT, question=question)
 
-def test_llm_ollama(question: str=""):
-    test_llm(llm_type=LLMType.OLLAMA, name=OllamaLLM.QWEN_1_5, question=question)
+def test_llm_doubao(question: str=""):
+    test_llm(llm_type=LLMType.DOUBAO, name=DouBaoLLM.LITE_32K, question=question)
 
+def test_llm_ollama(question: str=""):
+    test_llm(llm_type=LLMType.OLLAMA, name=OllamaLLM.QWEN_25_05B, question=question)
+
+def test_llm_step(question: str=""):
+    test_llm(llm_type=LLMType.STEP, name=StepLLM.STEP_15V_MIMI, question=question,question_type="image")
+
+def test_llm_bai_chuan(question: str=""):
+    test_llm(llm_type=LLMType.BAICHUAN, name=BaiChuanLLM.BAICHUAN4_AIR, question=question)
 
 if __name__ == "__main__":
-    question = "你好"
-    test_llm_zhipu(question=question)
+    question = "讲个故事"
+    test_llm_bai_chuan(question=question)
