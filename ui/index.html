@@ -120,16 +120,19 @@
                 </tr>
             </table>
         </div>
-        <div id="status">Ready</div>
-        <div id="conversationLog"></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin: 1rem;">
+            <div id="status" style="margin: 0 1rem;">Ready</div>
+            <div id="timer" style="margin: 0 1rem;">00:00:000</div>
+            <button id="vadToggle" style="margin: 0 0.5rem; width: auto;">Enable Voice Auto Detection</button>
+            <button id="recordButton" style="margin: 0 0.5rem; width: auto;">Press and Hold to Chat</button>
+        </div>
+        <!-- <p>You can also hold the space bar to chat!</p> -->
 
-        <div id="timer">00:00:000</div>
-        <button id="vadToggle">Enable Voice Auto Detection</button>
-        <button id="recordButton">Press and Hold to Chat</button>
-        <p>You can also hold the space bar to chat!</p>
-
-        <div id="logArea"></div>
+        <!-- <div id="logArea"></div> -->
+        <!-- <div id="conversationLog"></div> -->
         <input type="file" id="imageUpload" accept="image/*">
+
+        <input type="text" id="textInput" style="width: 100%; height: 2rem; margin-top: 1rem;">
     </div>
 
     <script>
@@ -140,6 +143,7 @@
         const logArea = document.getElementById('logArea');
         const timerDisplay = document.getElementById('timer');
         const imageUpload = document.getElementById('imageUpload');
+        const textInput = document.getElementById('textInput');
 
         // Network
         let startTime;
@@ -153,6 +157,8 @@
         let recordingStartTime;
         let timerInterval;
         let recorder;
+        let recordingEndTime;
+        const messageTimes = {};
 
         // VAD
         let isVADEnabled = false;
@@ -307,6 +313,7 @@
             if (isRecording) {
                 isRecording = false;
                 try {
+                    recordingEndTime = performance.now();
                     window.processor.disconnect();
                     await window.audioContext.close().catch(error => {
                         log(`Error closing audio context: ${error.message}`);
@@ -351,16 +358,20 @@
                         // log('Sent stop_recording message');
                         const pcm_uint8Array = new Uint8Array(pcmArrayBuffer);
                         const pcm_binary = pcm_uint8Array.reduce((str, byte) => str + String.fromCharCode(byte), '');
+                        const message_id = getMessageId();
                         socket.send(JSON.stringify({
                             version:"1.0",
                             method:"voice-chat",
                             conversation_id:conversation_id,
-                            message_id:getMessageId(),
-                            token:getMessageId(),
+                            message_id:message_id,
+                            token:message_id,
                             data: {
                                 content: btoa(pcm_binary)
                             }
                         }));
+                        // 消息产生时间
+                        messageTimes[message_id] = recordingEndTime;
+                        log(`音频处理时间: ${ performance.now() - recordingEndTime} 毫秒`);
                         log('voice-chat PCM audio data sent successfully');
                     } else {
                         log('WebSocket is not open. Cannot send audio.');
@@ -455,7 +466,7 @@
 
         function log(message) {
             const timestamp = new Date().toISOString();
-            logArea.innerHTML = `${timestamp} - ${message}<br>` + logArea.innerHTML;
+            // logArea.innerHTML = `${timestamp} - ${message}<br>` + logArea.innerHTML;
             console.log(`${timestamp} - ${message}`); // 也在控制台输出日志，便于调试
         }
 
@@ -553,7 +564,9 @@
                 };
 
                 socket.onmessage = (event) => {
-                    log(`Parsed server message: ${JSON.stringify(JSON.parse(event.data))}`);
+                    const data = JSON.parse(event.data);
+                    // Only log limited info about the message without modifying it
+                    logRecvMsg(data);
 
                     if (event.data instanceof ArrayBuffer) {
                         // 处理 PCM 数据
@@ -597,21 +610,31 @@
                                 log(`Error from server: ${message.message}`);
                                 updateStatus('Error');
                             }else if (message.method === 'voice-chat') {
-                                log(`Received voice-chat message audio_format:${message.data.audio_format}`);
-                                // updateAIResponse(message.data.text);
-                                if(message.data.audio_format === 'mp3') {
+                                message_id = message.message_id;
+                                log(`Received voice-chat message audio_format:${message.data?.audio_format} message_id:${message_id}`);
+                                if (messageTimes[message_id] && data.data?.stream_seq == 1) {
+                                    const receiveTime = performance.now();
+                                    const sendTime = messageTimes[message_id];
+                                    const delay = receiveTime - sendTime;
+                                    log(`消息 ${message_id} 的延迟时间: ${delay} 毫秒`);
+                                    updateLatencyMetrics({ total_voice_to_voice: delay });
+                                    // 清除该消息的记录
+                                    delete messageTimes[message_id];                                    
+                                }
+                                updateAIResponse(message.data?.text);
+                                if(message.data?.audio_format === 'mp3') {
                                     cleanupAudio();
-                                    playMP3(message.data.audio_data);
-                                } else if(message.data.audio_format === 'pcm') {
-                                    handleReceivedPCM(message.data.audio_data);
+                                    playMP3(message.data?.audio_data);
+                                } else if(message.data?.audio_format === 'pcm') {
+                                    handleReceivedPCM(message.data?.audio_data);
                                 } else {
-                                    log(`Received unknown audio format: ${message.data.audio_format}`);
+                                    log(`Received unknown audio format: ${message.data?.audio_format}`);
                                 }
                             } else {
                                 log(`Received unknown message type: ${message.type}`);
                             }
                         } catch (error) {
-                            log(`Parsed server message: ${JSON.stringify(JSON.parse(event.data))}`);
+                            log(`socket.onmessage error! ${error.message} stack:${error.stack}`);
                         }
                     }
                 };
@@ -874,6 +897,80 @@ function cleanupAudio() {
                 log('WebSocket is not open. Cannot send image.');
             }
         }
+
+        textInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                const text = textInput.value;
+                if (text) {
+                    sendText(text);
+                    textInput.value = '';
+                }
+            }
+        });
+
+        function sendText(text) {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    version: "1.0",
+                    method: "voice-chat",
+                    conversation_id: conversation_id,
+                    message_id: getMessageId(),
+                    token: getMessageId(),
+                    data: {
+                        content_type: "text",
+                        content: text
+                    }
+                }));
+                log('Text data sent successfully');
+            } else {
+                log('WebSocket is not open. Cannot send text.');
+            }
+        }
+
+        function updateAIResponse(newContent) {
+            // currentAIResponse += newContent;
+            // if (!aiMessageElement) {
+            //     aiMessageElement = displayMessage('AI', '');
+            // }
+            // aiMessageElement.innerHTML = `AI: ${currentAIResponse}${isAIResponding ? '<span class="ai-cursor"></span>' : ''}`;
+            // const conversationLog = document.getElementById('conversationLog');
+            // conversationLog.scrollTop = conversationLog.scrollHeight;
+        }
+
+
+        function updateLatencyMetrics(metrics) {
+            document.getElementById("totalVoiceToVoice").textContent = `${(metrics.total_voice_to_voice).toFixed(1)}ms`;
+            // document.getElementById("srtDuration").textContent = `${(metrics.srt_duration * 1000).toFixed(1)}ms`;
+            // document.getElementById("llmTTFT").textContent = `${(metrics.llm_ttft * 1000).toFixed(1)}ms`;
+            // document.getElementById("llmTTFS").textContent = `${(metrics.llm_ttfs * 1000).toFixed(1)}ms`;
+            // document.getElementById("ttsDuration").textContent = `${(metrics.tts_duration * 1000).toFixed(1)}ms`;
+        }        
+
+        const logRecvMsg = (data) => {
+            // 创建一个新对象来存储日志内容
+            const logObject = {};
+            
+            // 复制所有顶层属性
+            for (const key in data) {
+                if (key !== 'data') {
+                logObject[key] = data[key];
+                }
+            }
+            
+            // 单独处理 data 属性，排除 audio_data
+            if (data.data) {
+                logObject.data = {};
+                for (const key in data.data) {
+                if (key !== 'audio_data') {
+                    logObject.data[key] = data.data[key];
+                }else{
+                    if (data.data[key]) {
+                        logObject.data[key] = data.data[key].length;}
+                }};
+            }
+            
+            log(JSON.stringify(logObject));
+        };
 
         // Initialize recorder and WebSocket when the page loads
         window.onload = async () => {

@@ -57,7 +57,7 @@ class DoubaoTTS(BaseTTS):
             raise ValueError(f"Environment variable {self.ACCESS_TOKEN_ENV_KEY} is not set.")
         return access_token
 
-    def _build_request(self, text: str) -> dict:
+    def _build_request(self, text: str, audio_format: str="pcm", compression_rate:int=10) -> dict:
         return {
             "app": {
                 "appid": self.appid,
@@ -69,8 +69,9 @@ class DoubaoTTS(BaseTTS):
             },
             "audio": {
                 "voice_type": self.voice_type,
-                "encoding": "pcm",
+                "encoding": audio_format,
                 "rate": 16000,
+                "compression_rate": compression_rate,
                 "speed_ratio": 1.0,
                 "volume_ratio": 1.0,
                 "pitch_ratio": 1.0,
@@ -85,11 +86,14 @@ class DoubaoTTS(BaseTTS):
             }
         }
 
-    async def tts(self, text: str) -> TTSRsp:
+    async def tts(self, text: str, audio_format: str="pcm", compression_rate:int=10) -> TTSRsp:
         try:
             start_time = time.perf_counter()
             
-            request_json = self._build_request(text)
+            request_json = self._build_request(
+                text=text,
+                audio_format=audio_format,
+                compression_rate=compression_rate)
             L.debug(f"doubao tts req: {json.dumps(request_json, indent=2, ensure_ascii=False)} trace_sn:{self.trace_sn}")
             
             async with aiohttp.ClientSession() as session:
@@ -116,7 +120,7 @@ class DoubaoTTS(BaseTTS):
                         )
                     
                     audio_data = base64.b64decode(resp_json["data"])
-                    output_path = os.path.join(settings.OUTPUT_ROOT_PATH, get_filename(trace_sn=self.trace_sn))
+                    output_path = os.path.join(settings.OUTPUT_ROOT_PATH, get_filename(trace_sn=self.trace_sn, ext=audio_format))
 
                     try:
                         async with aiofiles.open(output_path, "wb") as f:
@@ -132,15 +136,13 @@ class DoubaoTTS(BaseTTS):
                             price=0.0, 
                             cost=int((end_time - start_time) * 1000)
                         )
-                        
-                    return TTSRsp(
+
+                    rsp = TTSRsp(
                         code=0,
                         message="Success", 
                         text=text,
                         audio_data=audio_data,
-                        audio_format="pcm",
-                        sample_format="S16LE",
-                        bitrate=256000,
+                        audio_format=audio_format,
                         channels=1,
                         sample_rate=16000,
                         audio_path=output_path,
@@ -149,6 +151,10 @@ class DoubaoTTS(BaseTTS):
                         price=0.0,
                         cost=int((end_time - start_time) * 1000)
                     )
+                    if audio_format == "pcm":
+                        rsp.sample_format = "S16LE"
+                        rsp.bitrate = 256000
+                    return rsp
             
         except Exception as e:
             return TTSRsp(

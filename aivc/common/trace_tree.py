@@ -54,6 +54,7 @@ class TraceTTSResp(BaseModel):
     audio_file_size: Optional[int] = 0
     cost: Optional[int] = 0
     stream_seq: Optional[int] = 0
+    send_timestamp: Optional[str] = ""
 
 class TraceTTS(BaseModel):
     first_cost: int = 0

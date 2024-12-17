@@ -11,15 +11,18 @@ class VCMethod(str, Enum):
     VOICE_CHAT = "voice-chat"
     TEXT_CHAT = "text-chat"
     PING = "ping"
+    PONG = "pong"
 
 
 class ContentType(str, Enum):
     AUDIO = "audio"
     IMAGE = "image"
+    TEXT = "text"
 
 class VCReqData(BaseModel):
     content_type: Optional[str] = ContentType.AUDIO.value  # audio or image
     content: Optional[str] = "" # base64 encoded data
+    tts_audio_format: Optional[str] = "pcm" # pcm|ogg_opus|mp3
 
 DataT = TypeVar("DataT")
 
@@ -31,6 +34,12 @@ class Req(BaseModel, Generic[DataT]):
     token: Optional[str] = ""
     timestamp: Optional[str] = ""
     data: Optional[DataT] = None
+
+    def __str__(self):
+        data_str = ""
+        if isinstance(self.data, VCReqData):
+            data_str = f"content_type: {self.data.content_type} content len: {len(self.data.content)} tts_audio_format: {self.data.tts_audio_format}"
+        return f"version: {self.version} method: {self.method} conversation_id: {self.conversation_id} message_id: {self.message_id} token: {self.token} timestamp: {self.timestamp} data: {data_str}"
 
 class VCRespData(BaseModel):
     action: Optional[str] = None
@@ -55,7 +64,8 @@ class Resp(BaseModel, Generic[DataT]):
     def __str__(self):
         data_str = ""
         if isinstance(self.data, VCRespData):
-            data_str = f"audio_format:{self.data.audio_format} audio_data len: {len(self.data.audio_data)} text: {self.data.text} stream_seq: {self.data.stream_seq}"
+            audio_data_len = len(self.data.audio_data) if self.data.audio_data else 0
+            data_str = f"action:{self.data.action} audio_format:{self.data.audio_format} audio_data len: {audio_data_len} text: {self.data.text} stream_seq: {self.data.stream_seq}"
         return f"version: {self.version} method: {self.method} conversation_id: {self.conversation_id} message_id: {self.message_id} code: {self.code} message: {self.message} data:: {data_str}"
 
 class Prompt(BaseModel):

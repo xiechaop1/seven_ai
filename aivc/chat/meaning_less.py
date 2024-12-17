@@ -9,7 +9,8 @@ class MeaninglessWords:
             "嗯嗯。",
             "这个。",
             "不是。",
-            "就是。"
+            "就是。",
+            "细胞。"
         ]
     
     def is_meaningless(self, text):

@@ -10,6 +10,9 @@ from aivc.chat.llm.providers.zhipu import ZhiPuLLM
 from aivc.chat.llm.providers.moonshot import MoonShotLLM
 from aivc.chat.llm.providers.ollama import OllamaLLM
 from aivc.chat.llm.providers.doubao import DouBaoLLM
+from aivc.chat.llm.providers.siliconflow import SiliconFlowLLM
+from aivc.chat.llm.providers.step import StepLLM
+from aivc.chat.llm.providers.baichuan import BaiChuanLLM
 from pydantic import BaseModel, field_validator
 from transformers import AutoTokenizer
 import tiktoken
@@ -23,6 +26,9 @@ class LLMType(Enum):
     MOONSHOT = MoonShotLLM.PROVIDER
     OLLAMA = OllamaLLM.PROVIDER
     DOUBAO = DouBaoLLM.PROVIDER
+    SILICON = SiliconFlowLLM.PROVIDER
+    STEP = StepLLM.PROVIDER
+    BAICHUAN = BaiChuanLLM.PROVIDER
     
     @classmethod
     def from_str(cls, value: str) -> 'LLMType':
@@ -57,7 +63,10 @@ class LLMManager:
         LLMType.ZhiPu: ZhiPuLLM,
         LLMType.MOONSHOT: MoonShotLLM,
         LLMType.OLLAMA: OllamaLLM,
-        LLMType.DOUBAO: DouBaoLLM
+        LLMType.DOUBAO: DouBaoLLM,
+        LLMType.SILICON: SiliconFlowLLM,
+        LLMType.STEP: StepLLM,
+        LLMType.BAICHUAN: BaiChuanLLM
     }
 
     @staticmethod

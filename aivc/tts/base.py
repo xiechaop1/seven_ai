@@ -6,5 +6,5 @@ class BaseTTS(ABC):
         self.trace_sn = trace_sn
 
     @abstractmethod
-    async def tts(self, text: str) -> TTSRsp:
+    async def tts(self, text: str, audio_format:str, compression_rate:int) -> TTSRsp:
         pass
